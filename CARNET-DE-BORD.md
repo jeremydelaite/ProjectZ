@@ -1,9 +1,7 @@
 # ProjectZ — Carnet de bord
 
 > Journal de développement. Une entrée par session de travail : ce qui a été fait,
-> les commits, et où reprendre. Specs détaillées dans les issues GitHub et les
-> docs du projet Claude (mini-GDD, zombies & manches, armes).
-
+> les commits, et où reprendre.
 ---
 
 ## Vue d'ensemble
@@ -105,6 +103,7 @@ Coureur, Pionnier et Gazé viendront plus tard.
 2. Équilibrage en jeu (prix des débris, cadences, scaling) au fil des tests
 3. Plus tard : autres types de zombies, récompenses de manche (tous les 5 niveaux),
    amélioration d'armes (atelier d'armurier), vrais assets graphiques
+4. revoir les collisions des zombies.
 
 ## Points de réglage rapides
 
