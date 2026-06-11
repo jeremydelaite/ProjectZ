@@ -1,6 +1,14 @@
 import Phaser from 'phaser';
 import { GAME_WIDTH, GAME_HEIGHT } from '../config/game.config';
 import {
+  MAP_WIDTH,
+  MAP_HEIGHT,
+  PLAYER_START,
+  SPAWN_POINTS,
+  SPAWN_JITTER,
+} from '../config/map.config';
+import { VillageMap } from '../world/VillageMap';
+import {
   FANTASSIN_STATS,
   POINTS_PER_HIT,
   POINTS_PER_KILL,
@@ -14,6 +22,7 @@ import { RoundManager } from '../systems/RoundManager';
 export class GameScene extends Phaser.Scene {
   private player!: Player;
   private zombies: Zombie[] = [];
+  private walls: Phaser.GameObjects.Rectangle[] = [];
   private roundManager!: RoundManager;
   private gameOver: boolean = false;
 
@@ -33,21 +42,17 @@ export class GameScene extends Phaser.Scene {
     this.points = 0;
     this.kills = 0;
 
-    // Sol placeholder
-    this.add
-      .rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x1a1a1a)
-      .setDepth(0);
+    // Map du village
+    this.physics.world.setBounds(0, 0, MAP_WIDTH, MAP_HEIGHT);
+    const map = new VillageMap(this);
+    this.walls = map.obstacles;
 
-    // Quelques obstacles placeholder pour tester le positionnement
-    this.add.rectangle(400, 300, 80, 80, 0x333333).setDepth(1);
-    this.add.rectangle(800, 400, 120, 40, 0x333333).setDepth(1);
-    this.add.rectangle(600, 200, 40, 160, 0x333333).setDepth(1);
-
-    // Joueur
-    this.player = new Player(this, GAME_WIDTH / 2, GAME_HEIGHT / 2);
+    // Joueur — place du marché
+    this.player = new Player(this, PLAYER_START.x, PLAYER_START.y);
+    this.physics.add.collider(this.player, this.walls);
 
     // Camera
-    this.cameras.main.setBounds(0, 0, GAME_WIDTH, GAME_HEIGHT);
+    this.cameras.main.setBounds(0, 0, MAP_WIDTH, MAP_HEIGHT);
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
 
     // HUD
@@ -130,35 +135,21 @@ export class GameScene extends Phaser.Scene {
 
     // Les zombies ne s'empilent pas
     this.physics.collide(this.zombies, this.zombies);
+
+    // Murs : bloquent les zombies, arrêtent les balles
+    this.physics.collide(this.zombies, this.walls);
+    this.physics.overlap(this.player.bullets, this.walls, bullet => {
+      (bullet as Bullet).destroy();
+    });
   }
 
-  /** Spawn un Fantassin sur un bord aléatoire, avec les PV de la manche en cours. */
+  /** Spawn un Fantassin à une brèche aléatoire, avec les PV de la manche en cours. */
   private spawnZombie(): void {
     if (this.gameOver) return;
 
-    const margin = 20;
-    const edge = Phaser.Math.Between(0, 3);
-    let x = 0;
-    let y = 0;
-
-    switch (edge) {
-      case 0: // haut
-        x = Phaser.Math.Between(0, GAME_WIDTH);
-        y = -margin;
-        break;
-      case 1: // bas
-        x = Phaser.Math.Between(0, GAME_WIDTH);
-        y = GAME_HEIGHT + margin;
-        break;
-      case 2: // gauche
-        x = -margin;
-        y = Phaser.Math.Between(0, GAME_HEIGHT);
-        break;
-      case 3: // droite
-        x = GAME_WIDTH + margin;
-        y = Phaser.Math.Between(0, GAME_HEIGHT);
-        break;
-    }
+    const point = Phaser.Math.RND.pick(SPAWN_POINTS);
+    const x = point.x + Phaser.Math.Between(-SPAWN_JITTER, SPAWN_JITTER);
+    const y = point.y + Phaser.Math.Between(-SPAWN_JITTER, SPAWN_JITTER);
 
     const stats = {
       ...FANTASSIN_STATS,

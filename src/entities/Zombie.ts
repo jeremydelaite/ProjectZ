@@ -71,6 +71,16 @@ export class Zombie extends Phaser.GameObjects.Container {
       Math.cos(angle) * this.stats.speed,
       Math.sin(angle) * this.stats.speed
     );
+
+    // Contournement basique : bloqué contre un mur → glisser le long
+    const blocked = this.body.blocked;
+    if (blocked.left || blocked.right) {
+      const dirY = Math.sign(player.y - this.y) || 1;
+      this.body.setVelocity(0, dirY * this.stats.speed);
+    } else if (blocked.up || blocked.down) {
+      const dirX = Math.sign(player.x - this.x) || 1;
+      this.body.setVelocity(dirX * this.stats.speed, 0);
+    }
   }
 
   /** Appelé par la scène quand le zombie touche le joueur. */
