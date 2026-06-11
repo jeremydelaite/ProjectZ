@@ -3,7 +3,7 @@ import { ZombieStats } from '../types';
 // 🧟 Le Fantassin — zombie de base (Issue #4)
 // Soldat de la Wehrmacht réanimé. Lent, peu de PV, toujours majoritaire.
 export const FANTASSIN_STATS: ZombieStats = {
-  hp: 50,              // PV à la manche 1 (scaling via formule plus tard)
+  hp: 50,              // PV à la manche 1 (scalés via fantassinHpForRound)
   speed: 60,           // marche traînante (joueur : 200)
   damage: 20,          // dégâts par coup
   attackCooldown: 1000, // ms entre deux coups
@@ -13,6 +13,28 @@ export const FANTASSIN_STATS: ZombieStats = {
 export const POINTS_PER_HIT = 10;  // balle qui touche
 export const POINTS_PER_KILL = 50; // bonus à la mort
 
-// Spawner de test — sera remplacé par le système de manches (Issue #4)
-export const TEST_SPAWN_DELAY = 2000;    // ms entre deux spawns
-export const MAX_ZOMBIES_ON_SCREEN = 10; // plafond simultané (24-30 prévu en prod)
+// --- Système de manches (Issue #4) ---
+
+export const SPAWN_INTERVAL = 1200;       // ms entre deux spawns pendant une manche
+export const MAX_ZOMBIES_ON_SCREEN = 24;  // plafond simultané (perfs + lisibilité)
+export const INTERMISSION_DURATION = 5000; // ms d'accalmie entre deux manches
+
+/** Nombre total de zombies de la manche : 0.15·m² + 4·m + 6 */
+export function zombiesForRound(round: number): number {
+  return Math.round(0.15 * round * round + 4 * round + 6);
+}
+
+/**
+ * PV du Fantassin selon la manche :
+ * - jusqu'à la manche 10 : +10 % du PV de base par manche
+ * - au-delà : exponentiel doux ×1.05 par manche
+ * C'est ce scaling qui rendra l'amélioration d'armes obligatoire.
+ */
+export function fantassinHpForRound(round: number): number {
+  const base = FANTASSIN_STATS.hp;
+  if (round <= 10) {
+    return Math.round(base * (1 + 0.10 * (round - 1)));
+  }
+  const hpRound10 = base * (1 + 0.10 * 9);
+  return Math.round(hpRound10 * Math.pow(1.05, round - 10));
+}

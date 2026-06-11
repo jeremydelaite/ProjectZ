@@ -1,24 +1,26 @@
 import Phaser from 'phaser';
 import { GAME_WIDTH, GAME_HEIGHT } from '../config/game.config';
 import {
+  FANTASSIN_STATS,
   POINTS_PER_HIT,
   POINTS_PER_KILL,
-  TEST_SPAWN_DELAY,
-  MAX_ZOMBIES_ON_SCREEN,
+  fantassinHpForRound,
 } from '../config/zombies.config';
 import { Player } from '../entities/Player';
 import { Zombie } from '../entities/Zombie';
 import { Bullet } from '../entities/Bullet';
+import { RoundManager } from '../systems/RoundManager';
 
 export class GameScene extends Phaser.Scene {
   private player!: Player;
   private zombies: Zombie[] = [];
-  private spawnTimer!: Phaser.Time.TimerEvent;
+  private roundManager!: RoundManager;
   private gameOver: boolean = false;
 
   private points: number = 0;
   private kills: number = 0;
   private hudText!: Phaser.GameObjects.Text;
+  private roundText!: Phaser.GameObjects.Text;
 
   constructor() {
     super({ key: 'GameScene' });
@@ -48,15 +50,7 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.setBounds(0, 0, GAME_WIDTH, GAME_HEIGHT);
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
 
-    // Spawner de test — sera remplacé par le système de manches
-    this.spawnTimer = this.time.addEvent({
-      delay: TEST_SPAWN_DELAY,
-      loop: true,
-      callback: this.spawnZombie,
-      callbackScope: this,
-    });
-
-    // HUD points
+    // HUD
     this.hudText = this.add
       .text(16, GAME_HEIGHT - 32, '', {
         font: 'bold 16px monospace',
@@ -64,12 +58,32 @@ export class GameScene extends Phaser.Scene {
       })
       .setScrollFactor(0)
       .setDepth(100);
+
+    this.roundText = this.add
+      .text(GAME_WIDTH - 16, 16, '', {
+        font: 'bold 22px monospace',
+        color: '#ff1744',
+      })
+      .setOrigin(1, 0)
+      .setScrollFactor(0)
+      .setDepth(100);
+
     this.updateHud();
 
     // Événements
     this.events.on('playerDead', this.onPlayerDead, this);
     this.events.on('zombieHit', this.onZombieHit, this);
     this.events.on('zombieKilled', this.onZombieKilled, this);
+    this.events.on('roundStarted', this.onRoundStarted, this);
+    this.events.on('roundEnded', this.onRoundEnded, this);
+
+    // Manches
+    this.roundManager = new RoundManager(
+      this,
+      () => this.spawnZombie(),
+      () => this.zombies.filter(z => z.active && z.isAlive()).length
+    );
+    this.roundManager.start();
 
     // Debug
     if (import.meta.env.DEV) {
@@ -88,6 +102,8 @@ export class GameScene extends Phaser.Scene {
 
     const pointer = this.input.activePointer;
     this.player.update(time, delta, pointer);
+
+    this.roundManager.update(time, delta);
 
     // Purge des zombies détruits + update
     this.zombies = this.zombies.filter(z => z.active);
@@ -115,10 +131,9 @@ export class GameScene extends Phaser.Scene {
     this.physics.collide(this.zombies, this.zombies);
   }
 
-  /** Spawn un Fantassin sur un bord aléatoire de la map. */
+  /** Spawn un Fantassin sur un bord aléatoire, avec les PV de la manche en cours. */
   private spawnZombie(): void {
     if (this.gameOver) return;
-    if (this.zombies.length >= MAX_ZOMBIES_ON_SCREEN) return;
 
     const margin = 20;
     const edge = Phaser.Math.Between(0, 3);
@@ -144,7 +159,54 @@ export class GameScene extends Phaser.Scene {
         break;
     }
 
-    this.zombies.push(new Zombie(this, x, y));
+    const stats = {
+      ...FANTASSIN_STATS,
+      hp: fantassinHpForRound(this.roundManager.getRound()),
+    };
+    this.zombies.push(new Zombie(this, x, y, stats));
+  }
+
+  private onRoundStarted(round: number): void {
+    this.roundText.setText(`Manche ${round}`);
+
+    // Annonce centrale qui s'estompe
+    const announce = this.add
+      .text(GAME_WIDTH / 2, GAME_HEIGHT / 3, `— MANCHE ${round} —`, {
+        font: 'bold 48px monospace',
+        color: '#ff1744',
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(150)
+      .setAlpha(0);
+
+    this.tweens.add({
+      targets: announce,
+      alpha: 1,
+      duration: 400,
+      hold: 1200,
+      yoyo: true,
+      onComplete: () => announce.destroy(),
+    });
+  }
+
+  private onRoundEnded(round: number): void {
+    const text = this.add
+      .text(GAME_WIDTH / 2, GAME_HEIGHT / 3, `Manche ${round} terminée`, {
+        font: 'bold 28px monospace',
+        color: '#9e9e9e',
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(150);
+
+    this.tweens.add({
+      targets: text,
+      alpha: 0,
+      delay: 1500,
+      duration: 600,
+      onComplete: () => text.destroy(),
+    });
   }
 
   private onZombieHit(): void {
@@ -164,14 +226,19 @@ export class GameScene extends Phaser.Scene {
 
   private onPlayerDead(): void {
     this.gameOver = true;
-    this.spawnTimer.remove();
     this.zombies.forEach(z => z.body && z.body.setVelocity(0, 0));
 
     this.add
-      .text(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'GAME OVER', {
-        font: 'bold 64px monospace',
-        color: '#ff1744',
-      })
+      .text(
+        GAME_WIDTH / 2,
+        GAME_HEIGHT / 2,
+        `GAME OVER\n\nManche ${this.roundManager.getRound()} — ${this.kills} kills — ${this.points} points`,
+        {
+          font: 'bold 40px monospace',
+          color: '#ff1744',
+          align: 'center',
+        }
+      )
       .setOrigin(0.5)
       .setScrollFactor(0)
       .setDepth(200);
