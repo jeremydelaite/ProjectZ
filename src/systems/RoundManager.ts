@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import {
   zombiesForRound,
-  SPAWN_INTERVAL,
+  spawnIntervalForRound,
   MAX_ZOMBIES_ON_SCREEN,
   INTERMISSION_DURATION,
 } from '../config/zombies.config';
@@ -51,7 +51,7 @@ export class RoundManager {
     if (this.remainingToSpawn > 0) {
       this.spawnAccumulator += delta;
       if (
-        this.spawnAccumulator >= SPAWN_INTERVAL &&
+        this.spawnAccumulator >= spawnIntervalForRound(this.round) &&
         this.getAliveCount() < MAX_ZOMBIES_ON_SCREEN
       ) {
         this.spawnAccumulator = 0;
@@ -73,7 +73,7 @@ export class RoundManager {
     this.round++;
     this.inIntermission = false;
     this.remainingToSpawn = zombiesForRound(this.round);
-    this.spawnAccumulator = SPAWN_INTERVAL; // premier spawn immédiat
+    this.spawnAccumulator = spawnIntervalForRound(this.round); // premier spawn immédiat
     this.scene.events.emit('roundStarted', this.round);
   }
 }

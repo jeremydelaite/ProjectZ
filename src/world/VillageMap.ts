@@ -36,7 +36,7 @@ export class VillageMap {
     scene.add.rectangle(MAP_WIDTH / 2, 720, MAP_WIDTH, 120, 0x2b2926).setDepth(0);
 
     // Dalles de l'église (décor)
-    scene.add.rectangle(1280, 480, 648, 488, 0x322e28).setDepth(0);
+    scene.add.rectangle(1280, 530, 936, 696, 0x322e28).setDepth(0);
 
     // Murs et obstacles
     for (const def of WALLS) {

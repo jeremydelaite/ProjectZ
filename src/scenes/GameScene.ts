@@ -21,7 +21,7 @@ import { RoundManager } from '../systems/RoundManager';
 import { Pathfinder } from '../systems/Pathfinding';
 import { VillageMap, DebrisObject } from '../world/VillageMap';
 
-const INTERACT_RANGE = 70; // distance pour interagir avec les débris
+const INTERACT_RANGE = 90; // distance pour interagir avec les débris
 
 export class GameScene extends Phaser.Scene {
   private player!: Player;

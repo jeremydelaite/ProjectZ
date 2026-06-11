@@ -15,8 +15,16 @@ export const POINTS_PER_KILL = 50; // bonus à la mort
 
 // --- Système de manches (Issue #4) ---
 
-export const SPAWN_INTERVAL = 1200;       // ms entre deux spawns pendant une manche
 export const MAX_ZOMBIES_ON_SCREEN = 24;  // plafond simultané (perfs + lisibilité)
+
+/**
+ * Intervalle entre deux spawns selon la manche : départ tranquille,
+ * accélère de manche en manche jusqu'à un plancher.
+ * Manche 1 : 2800 ms · manche 4 : 1900 ms · manche 7+ : 1000 ms
+ */
+export function spawnIntervalForRound(round: number): number {
+  return Math.max(1000, 2800 - (round - 1) * 300);
+}
 export const INTERMISSION_DURATION = 5000; // ms d'accalmie entre deux manches
 
 /** Nombre total de zombies de la manche : 0.15·m² + 4·m + 6 */
