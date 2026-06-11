@@ -102,6 +102,7 @@ export class GameScene extends Phaser.Scene {
 
     const pointer = this.input.activePointer;
     this.player.update(time, delta, pointer);
+    this.updateHud();
 
     this.roundManager.update(time, delta);
 
@@ -221,7 +222,11 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateHud(): void {
-    this.hudText.setText(`Points : ${this.points}   Kills : ${this.kills}`);
+    const ammo = this.player.isReloadingNow()
+      ? 'RECHARGE\u2026'
+      : `${this.player.getAmmo()}/${this.player.getMagazineSize()}`;
+    const text = `Points : ${this.points}   Kills : ${this.kills}   Pistolet : ${ammo}`;
+    if (this.hudText.text !== text) this.hudText.setText(text);
   }
 
   private onPlayerDead(): void {

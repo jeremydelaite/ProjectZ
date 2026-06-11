@@ -17,4 +17,5 @@ export interface WeaponStats {
   bulletSpeed: number;
   magazineSize: number;
   currentAmmo: number;
+  reloadTime: number; // ms pour changer de chargeur (réserve illimitée)
 }
