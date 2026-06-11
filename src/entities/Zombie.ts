@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { ZombieStats } from '../types';
 import { FANTASSIN_STATS } from '../config/zombies.config';
 import { Player } from './Player';
+import { Pathfinder } from '../systems/Pathfinding';
 
 export class Zombie extends Phaser.GameObjects.Container {
   declare body: Phaser.Physics.Arcade.Body;
@@ -12,16 +13,28 @@ export class Zombie extends Phaser.GameObjects.Container {
   private lastAttack: number = 0;
   private isDead: boolean = false;
 
+  // Pathfinding
+  private pathfinder?: Pathfinder;
+  private path: Phaser.Math.Vector2[] = [];
+  private nextRepath: number = 0;
+
   // Visuel placeholder (même style que Player)
   private body_rect: Phaser.GameObjects.Rectangle;
   private hpBar: Phaser.GameObjects.Graphics;
 
-  constructor(scene: Phaser.Scene, x: number, y: number, stats: ZombieStats = FANTASSIN_STATS) {
+  constructor(
+    scene: Phaser.Scene,
+    x: number,
+    y: number,
+    stats: ZombieStats = FANTASSIN_STATS,
+    pathfinder?: Pathfinder
+  ) {
     super(scene, x, y);
 
     this.stats = stats;
     this.hp = stats.hp;
     this.maxHp = stats.hp;
+    this.pathfinder = pathfinder;
 
     // Corps feldgrau (uniforme Wehrmacht en lambeaux)
     this.body_rect = scene.add.rectangle(0, 0, 26, 26, 0x5c6b46);
@@ -57,7 +70,7 @@ export class Zombie extends Phaser.GameObjects.Container {
     this.hpBar.fillRect(-w / 2, -22, w * ratio, 3);
   }
 
-  update(_time: number, _delta: number, player: Player): void {
+  update(time: number, _delta: number, player: Player): void {
     if (this.isDead) return;
 
     if (!player.isAlive()) {
@@ -65,20 +78,53 @@ export class Zombie extends Phaser.GameObjects.Container {
       return;
     }
 
-    // Poursuite : marche traînante droit vers le joueur
-    const angle = Phaser.Math.Angle.Between(this.x, this.y, player.x, player.y);
+    // Cible : le joueur en ligne droite si rien ne gêne, sinon le prochain
+    // point du chemin A*.
+    let targetX = player.x;
+    let targetY = player.y;
+
+    if (this.pathfinder && !this.pathfinder.hasLineOfSight(this.x, this.y, player.x, player.y)) {
+      if (time >= this.nextRepath) {
+        // Repath étalé dans le temps pour lisser la charge CPU
+        this.nextRepath = time + 400 + Math.random() * 400;
+        this.path = this.pathfinder.findPath(this.x, this.y, player.x, player.y) ?? [];
+      }
+
+      // Avancer dans le chemin : points atteints, et raccourcis à vue
+      while (
+        this.path.length > 0 &&
+        Phaser.Math.Distance.Between(this.x, this.y, this.path[0].x, this.path[0].y) < 12
+      ) {
+        this.path.shift();
+      }
+      if (
+        this.path.length > 1 &&
+        this.pathfinder.hasLineOfSight(this.x, this.y, this.path[1].x, this.path[1].y)
+      ) {
+        this.path.shift();
+      }
+
+      if (this.path.length > 0) {
+        targetX = this.path[0].x;
+        targetY = this.path[0].y;
+      }
+    } else {
+      this.path = [];
+    }
+
+    const angle = Phaser.Math.Angle.Between(this.x, this.y, targetX, targetY);
     this.body.setVelocity(
       Math.cos(angle) * this.stats.speed,
       Math.sin(angle) * this.stats.speed
     );
 
-    // Contournement basique : bloqué contre un mur → glisser le long
+    // Filet de sécurité : si malgré tout bloqué contre un mur, glisser le long
     const blocked = this.body.blocked;
     if (blocked.left || blocked.right) {
-      const dirY = Math.sign(player.y - this.y) || 1;
+      const dirY = Math.sign(targetY - this.y) || 1;
       this.body.setVelocity(0, dirY * this.stats.speed);
     } else if (blocked.up || blocked.down) {
-      const dirX = Math.sign(player.x - this.x) || 1;
+      const dirX = Math.sign(targetX - this.x) || 1;
       this.body.setVelocity(dirX * this.stats.speed, 0);
     }
   }

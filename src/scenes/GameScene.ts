@@ -6,8 +6,8 @@ import {
   PLAYER_START,
   SPAWN_POINTS,
   SPAWN_JITTER,
+  WALLS,
 } from '../config/map.config';
-import { VillageMap } from '../world/VillageMap';
 import {
   FANTASSIN_STATS,
   POINTS_PER_HIT,
@@ -18,11 +18,16 @@ import { Player } from '../entities/Player';
 import { Zombie } from '../entities/Zombie';
 import { Bullet } from '../entities/Bullet';
 import { RoundManager } from '../systems/RoundManager';
+import { Pathfinder } from '../systems/Pathfinding';
+import { VillageMap, DebrisObject } from '../world/VillageMap';
+
+const INTERACT_RANGE = 70; // distance pour interagir avec les débris
 
 export class GameScene extends Phaser.Scene {
   private player!: Player;
   private zombies: Zombie[] = [];
-  private walls: Phaser.GameObjects.Rectangle[] = [];
+  private map!: VillageMap;
+  private pathfinder!: Pathfinder;
   private roundManager!: RoundManager;
   private gameOver: boolean = false;
 
@@ -30,6 +35,8 @@ export class GameScene extends Phaser.Scene {
   private kills: number = 0;
   private hudText!: Phaser.GameObjects.Text;
   private roundText!: Phaser.GameObjects.Text;
+  private promptText!: Phaser.GameObjects.Text;
+  private keyInteract!: Phaser.Input.Keyboard.Key;
 
   constructor() {
     super({ key: 'GameScene' });
@@ -42,18 +49,39 @@ export class GameScene extends Phaser.Scene {
     this.points = 0;
     this.kills = 0;
 
-    // Map du village
+    // Map du village + grille de pathfinding
     this.physics.world.setBounds(0, 0, MAP_WIDTH, MAP_HEIGHT);
-    const map = new VillageMap(this);
-    this.walls = map.obstacles;
+    this.map = new VillageMap(this);
 
-    // Joueur — place du marché
+    this.pathfinder = new Pathfinder(MAP_WIDTH, MAP_HEIGHT, 32);
+    for (const def of WALLS) {
+      this.pathfinder.addObstacleRect(def.x, def.y, def.w, def.h);
+    }
+    for (const d of this.map.debris) {
+      this.pathfinder.addObstacleRect(d.def.x, d.def.y, d.def.w, d.def.h);
+    }
+
+    // Joueur — devant l'autel de l'église
     this.player = new Player(this, PLAYER_START.x, PLAYER_START.y);
-    this.physics.add.collider(this.player, this.walls);
+    this.physics.add.collider(this.player, this.map.obstacles);
+    this.physics.add.collider(this.player, this.map.vitraux);
 
     // Camera
     this.cameras.main.setBounds(0, 0, MAP_WIDTH, MAP_HEIGHT);
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
+
+    // Interaction (déblayer les débris)
+    this.keyInteract = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E);
+    this.promptText = this.add
+      .text(0, 0, '', {
+        font: 'bold 14px monospace',
+        color: '#ffdd00',
+        backgroundColor: '#000000aa',
+        padding: { x: 6, y: 3 },
+      })
+      .setOrigin(0.5, 1)
+      .setDepth(150)
+      .setVisible(false);
 
     // HUD
     this.hudText = this.add
@@ -93,7 +121,7 @@ export class GameScene extends Phaser.Scene {
     // Debug
     if (import.meta.env.DEV) {
       this.add
-        .text(16, 16, 'ProjectZ — DEV | Clic gauche : tirer | ZQSD : bouger', {
+        .text(16, 16, 'ProjectZ — DEV | Clic : tirer | ZQSD : bouger | R : recharger | E : déblayer', {
           font: '13px monospace',
           color: '#666666',
         })
@@ -137,13 +165,76 @@ export class GameScene extends Phaser.Scene {
     this.physics.collide(this.zombies, this.zombies);
 
     // Murs : bloquent les zombies, arrêtent les balles
-    this.physics.collide(this.zombies, this.walls);
-    this.physics.overlap(this.player.bullets, this.walls, bullet => {
+    // (les vitraux ne bloquent ni les zombies ni les balles)
+    this.physics.collide(this.zombies, this.map.obstacles);
+    this.physics.overlap(this.player.bullets, this.map.obstacles, bullet => {
       (bullet as Bullet).destroy();
     });
+
+    // Débris encore en place : bloquent tout
+    const activeDebris = this.map.debris.filter(d => !d.cleared).map(d => d.rect);
+    if (activeDebris.length > 0) {
+      this.physics.collide(this.player, activeDebris);
+      this.physics.collide(this.zombies, activeDebris);
+      this.physics.overlap(this.player.bullets, activeDebris, bullet => {
+        (bullet as Bullet).destroy();
+      });
+    }
+
+    this.handleDebrisInteraction();
   }
 
-  /** Spawn un Fantassin à une brèche aléatoire, avec les PV de la manche en cours. */
+  /** Affiche le prompt près d'un débris et gère le déblaiement (touche E). */
+  private handleDebrisInteraction(): void {
+    let nearest: DebrisObject | null = null;
+    let nearestDist = INTERACT_RANGE;
+
+    for (const d of this.map.debris) {
+      if (d.cleared) continue;
+      const dist = Phaser.Math.Distance.Between(
+        this.player.x,
+        this.player.y,
+        d.def.x,
+        d.def.y
+      );
+      if (dist < nearestDist) {
+        nearest = d;
+        nearestDist = dist;
+      }
+    }
+
+    if (!nearest) {
+      this.promptText.setVisible(false);
+      return;
+    }
+
+    this.promptText
+      .setText(`E — Déblayer : ${nearest.def.label} (${nearest.def.price} pts)`)
+      .setPosition(nearest.def.x, nearest.def.y - nearest.def.h / 2 - 12)
+      .setVisible(true);
+
+    if (Phaser.Input.Keyboard.JustDown(this.keyInteract)) {
+      if (this.points >= nearest.def.price) {
+        this.points -= nearest.def.price;
+        this.map.clear(nearest);
+        // Le passage s'ouvre aussi pour le pathfinding des zombies
+        this.pathfinder.removeObstacleRect(
+          nearest.def.x,
+          nearest.def.y,
+          nearest.def.w,
+          nearest.def.h
+        );
+        this.promptText.setVisible(false);
+        this.updateHud();
+      } else {
+        // Pas assez de points : flash rouge
+        this.promptText.setColor('#ff1744');
+        this.time.delayedCall(300, () => this.promptText.setColor('#ffdd00'));
+      }
+    }
+  }
+
+  /** Spawn un Fantassin à un point d'apparition aléatoire. */
   private spawnZombie(): void {
     if (this.gameOver) return;
 
@@ -155,7 +246,7 @@ export class GameScene extends Phaser.Scene {
       ...FANTASSIN_STATS,
       hp: fantassinHpForRound(this.roundManager.getRound()),
     };
-    this.zombies.push(new Zombie(this, x, y, stats));
+    this.zombies.push(new Zombie(this, x, y, stats, this.pathfinder));
   }
 
   private onRoundStarted(round: number): void {
@@ -214,7 +305,7 @@ export class GameScene extends Phaser.Scene {
 
   private updateHud(): void {
     const ammo = this.player.isReloadingNow()
-      ? 'RECHARGE\u2026'
+      ? 'RECHARGE…'
       : `${this.player.getAmmo()}/${this.player.getMagazineSize()}`;
     const text = `Points : ${this.points}   Kills : ${this.kills}   Pistolet : ${ammo}`;
     if (this.hudText.text !== text) this.hudText.setText(text);
@@ -223,6 +314,7 @@ export class GameScene extends Phaser.Scene {
   private onPlayerDead(): void {
     this.gameOver = true;
     this.zombies.forEach(z => z.body && z.body.setVelocity(0, 0));
+    this.promptText.setVisible(false);
 
     this.add
       .text(
