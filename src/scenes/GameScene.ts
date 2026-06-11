@@ -1,77 +1,65 @@
 import Phaser from 'phaser';
 import { GAME_WIDTH, GAME_HEIGHT } from '../config/game.config';
+import { Player } from '../entities/Player';
 
 export class GameScene extends Phaser.Scene {
-  private player!: Phaser.GameObjects.Rectangle;
-  private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
-  private wasd!: {
-    up: Phaser.Input.Keyboard.Key;
-    down: Phaser.Input.Keyboard.Key;
-    left: Phaser.Input.Keyboard.Key;
-    right: Phaser.Input.Keyboard.Key;
-  };
-
-  private readonly PLAYER_SPEED = 200;
+  private player!: Player;
+  private gameOver: boolean = false;
 
   constructor() {
     super({ key: 'GameScene' });
   }
 
   create(): void {
-    // --- Placeholder ground ---
+    // Sol placeholder
     this.add
       .rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x1a1a1a)
       .setDepth(0);
 
-    // --- Player placeholder ---
-    this.player = this.add
-      .rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, 32, 32, 0x4caf50)
-      .setDepth(10);
+    // Quelques obstacles placeholder pour tester le positionnement
+    this.add.rectangle(400, 300, 80, 80, 0x333333).setDepth(1);
+    this.add.rectangle(800, 400, 120, 40, 0x333333).setDepth(1);
+    this.add.rectangle(600, 200, 40, 160, 0x333333).setDepth(1);
 
-    this.physics.add.existing(this.player);
+    // Joueur
+    this.player = new Player(this, GAME_WIDTH / 2, GAME_HEIGHT / 2);
 
-    // --- Camera ---
+    // Camera
     this.cameras.main.setBounds(0, 0, GAME_WIDTH, GAME_HEIGHT);
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
 
-    // --- Input ---
-    this.cursors = this.input.keyboard!.createCursorKeys();
-    this.wasd = {
-      up: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.Z),
-      down: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.S),
-      left: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.Q),
-      right: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D),
-    };
+    // Game Over
+    this.events.on('playerDead', this.onPlayerDead, this);
 
-    // --- Debug label ---
+    // Debug
     if (import.meta.env.DEV) {
       this.add
-        .text(16, 16, 'ProjectZ — DEV', { font: '14px monospace', color: '#888888' })
+        .text(16, 16, 'ProjectZ — DEV | Clic gauche : tirer | ZQSD : bouger', {
+          font: '13px monospace',
+          color: '#666666',
+        })
         .setScrollFactor(0)
         .setDepth(100);
     }
   }
 
-  update(): void {
-    const body = this.player.body as Phaser.Physics.Arcade.Body;
-    const speed = this.PLAYER_SPEED;
+  update(time: number, delta: number): void {
+    if (this.gameOver) return;
 
-    const left = this.cursors.left.isDown || this.wasd.left.isDown;
-    const right = this.cursors.right.isDown || this.wasd.right.isDown;
-    const up = this.cursors.up.isDown || this.wasd.up.isDown;
-    const down = this.cursors.down.isDown || this.wasd.down.isDown;
+    const pointer = this.input.activePointer;
+    this.player.update(time, delta, pointer);
+  }
 
-    body.setVelocity(0, 0);
+  private onPlayerDead(): void {
+    this.gameOver = true;
 
-    if (left) body.setVelocityX(-speed);
-    else if (right) body.setVelocityX(speed);
-
-    if (up) body.setVelocityY(-speed);
-    else if (down) body.setVelocityY(speed);
-
-    // Normalize diagonal movement
-    if ((left || right) && (up || down)) {
-      body.velocity.normalize().scale(speed);
-    }
+    this.add
+      .text(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'GAME OVER', {
+        font: 'bold 64px monospace',
+        color: '#ff1744',
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(200);
   }
 }
