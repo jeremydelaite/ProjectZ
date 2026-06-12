@@ -244,10 +244,18 @@ Coureur, Pionnier et Gazé viendront plus tard.
 
 ## Prochaines étapes
 
-1. Équilibrage en jeu (armes, prix, cadences, scaling) au fil des tests
-2. Plus tard : autres types de zombies, récompenses de manche (tous les 5 niveaux),
-   amélioration d'armes (atelier d'armurier), vue isométrique + vrais assets
-   graphiques (chantier DA)
+1. **Session d'équilibrage** : courbes PV/spawn, prix (débris 750, chargeurs 500),
+   dégâts des 5 armes, ratios SS/Coureur, poison — maintenant que toute la
+   difficulté est en place, jouer plusieurs runs et noter ce qui frustre
+2. **Atelier d'armurier** (Pack-a-Punch du GDD) : zone chère à débloquer,
+   amélioration d'arme ~5 000 pts (dégâts ×2,5, chargeur agrandi)
+3. **Récompenses de manche** restantes : power-ups temporaires éventuels
+   (points doublés, kill instantané) — la caisse de munitions des Gazés existe déjà
+4. **Le Pionnier** (tank, manche 8) si le jeu a besoin d'un casse-rythme
+5. **Chantier DA** : passage en vue isométrique + vrais assets (sprites,
+   tri de profondeur), sons d'armes — la logique actuelle reste valable
+6. Idées en réserve : récompense garantie toutes les 5 manches (soin/power-up),
+   high-score en ligne, grenades F1
 4. revoir les collisions des zombies.
 
 ## Points de réglage rapides
