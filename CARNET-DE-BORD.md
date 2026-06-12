@@ -165,6 +165,9 @@ src/
 - PV max 100 → **80** : 4 coups de Fantassin au lieu de 5
 - **Régénération** : 3 s sans dégât → remontée à 35 PV/s (~2,3 s pour tout
   récupérer) — réglable en tête de `Player.ts` (REGEN_DELAY / REGEN_RATE)
+- **Verrou de spawn 0,8 s** : ni tir ni déplacement au début d'une partie
+  (visée ok) — le clic sur « rejouer » ne part plus en coup de feu, et il faut
+  relâcher le clic avant de pouvoir tirer
 
 ---
 

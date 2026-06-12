@@ -23,6 +23,11 @@ export class Player extends Phaser.GameObjects.Container {
   private static readonly REGEN_RATE = 35;    // PV par seconde (~2,3 s pour tout)
   private lastDamageTime: number = -Infinity;
 
+  // Verrou de début de partie : ni tir ni déplacement pendant N ms
+  // (évite de tirer en spammant le clic sur « rejouer »)
+  private static readonly SPAWN_LOCK = 800; // ms
+  private controlsLockedUntil: number = 0;
+
   // 2 armes max : [0] = arme de poing (toujours là), [1] = arme principale
   private weapons: WeaponSlot[] = [
     {
@@ -93,6 +98,8 @@ export class Player extends Phaser.GameObjects.Container {
     };
 
     this.drawHpBar();
+
+    this.controlsLockedUntil = scene.time.now + Player.SPAWN_LOCK;
   }
 
   // ---------------------------------------------------------------- armes
@@ -202,14 +209,22 @@ export class Player extends Phaser.GameObjects.Container {
   update(time: number, delta: number, pointer: Phaser.Input.Pointer): void {
     if (this.isDead) return;
 
-    this.handleMovement();
     this.handleRotation(pointer);
+    this.updateBullets(delta);
+    this.drawReloadBar(time);
+
+    // Verrou de début de partie : viser ok, mais ni tir ni déplacement
+    if (time < this.controlsLockedUntil) {
+      this.body.setVelocity(0, 0);
+      if (pointer.isDown) this.pointerReleased = false; // oblige à relâcher le clic
+      return;
+    }
+
+    this.handleMovement();
     this.handleRegen(time, delta);
     this.handleSwitch();
     this.handleReload(time);
     this.handleShooting(time, pointer);
-    this.updateBullets(delta);
-    this.drawReloadBar(time);
   }
 
   private handleMovement(): void {
