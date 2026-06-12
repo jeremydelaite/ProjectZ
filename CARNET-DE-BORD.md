@@ -175,6 +175,12 @@ src/
   (ne bouge pas, n'attaque pas, n'est pas bousculé par les autres)
 - **Entrées cardinales** (4 brèches) : spawn HORS-map, le zombie entre en
   marchant par la brèche — plus aucune apparition « pop » visible
+- **Spawns v3 (hybride)** : 50 % des spawns sont des sorties de terre
+  dynamiques juste HORS du champ de la caméra (cellule libre, jamais dans
+  l'église — elle garde ses entrées connues) ; les 50 % restants tirent parmi
+  les 3 points fixes les plus proches du joueur. Fini les zombies qui
+  traversent toute la map — la pression arrive vite, où qu'on soit.
+  Réglage : `DYNAMIC_SPAWN_CHANCE` dans `zombies.config.ts`
 
 ---
 

@@ -17,6 +17,10 @@ export const POINTS_PER_KILL = 50; // bonus à la mort
 
 export const MAX_ZOMBIES_ON_SCREEN = 24;  // plafond simultané (perfs + lisibilité)
 
+// Part des spawns en « sortie de terre dynamique » juste hors du champ
+// de la caméra (le reste : points fixes les plus proches du joueur)
+export const DYNAMIC_SPAWN_CHANCE = 0.5;
+
 /**
  * Intervalle entre deux spawns selon la manche : départ tranquille,
  * accélère de manche en manche jusqu'à un plancher.

@@ -12,6 +12,7 @@ import {
   FANTASSIN_STATS,
   POINTS_PER_HIT,
   POINTS_PER_KILL,
+  DYNAMIC_SPAWN_CHANCE,
   fantassinHpForRound,
 } from '../config/zombies.config';
 import { Player } from '../entities/Player';
@@ -368,11 +369,62 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * Cherche un point de sortie de terre juste HORS du champ de la caméra :
+   * proche du joueur, sur une cellule libre, jamais dans l'église
+   * (elle garde ses entrées connues : vitraux + sorties).
+   */
+  private findOffscreenGroundSpot(): { x: number; y: number } | null {
+    const view = this.cameras.main.worldView;
+    const baseRadius = Math.hypot(view.width, view.height) / 2;
+
+    for (let i = 0; i < 12; i++) {
+      const angle = Phaser.Math.FloatBetween(0, Math.PI * 2);
+      const radius = baseRadius + Phaser.Math.Between(60, 260);
+      const x = this.player.x + Math.cos(angle) * radius;
+      const y = this.player.y + Math.sin(angle) * radius;
+
+      // Dans la map (marge des murs d'enceinte)
+      if (x < 60 || y < 60 || x > MAP_WIDTH - 60 || y > MAP_HEIGHT - 60) continue;
+      // Jamais dans l'église (intérieur + marge)
+      if (x > 810 && x < 1750 && y > 180 && y < 880) continue;
+      // Toujours hors champ
+      if (view.contains(x, y)) continue;
+      // Sur une cellule libre de la grille
+      if (this.pathfinder.isBlockedAt(x, y)) continue;
+
+      return { x, y };
+    }
+    return null;
+  }
+
   /** Spawn un Fantassin : sortie de terre (ground) ou entrée cardinale (edge). */
   private spawnZombie(): void {
     if (this.gameOver) return;
 
-    const point = Phaser.Math.RND.pick(SPAWN_POINTS);
+    const stats = {
+      ...FANTASSIN_STATS,
+      hp: fantassinHpForRound(this.roundManager.getRound()),
+    };
+
+    // Sortie de terre dynamique juste hors champ (réduit le temps de trajet,
+    // surtout quand le joueur est retranché dans l'église)
+    if (Math.random() < DYNAMIC_SPAWN_CHANCE) {
+      const spot = this.findOffscreenGroundSpot();
+      if (spot) {
+        const emergeMs = Phaser.Math.Between(2000, 3000);
+        this.zombies.push(new Zombie(this, spot.x, spot.y, stats, this.pathfinder, emergeMs));
+        return;
+      }
+    }
+
+    // Sinon : un des 3 points fixes les plus proches du joueur
+    const sorted = [...SPAWN_POINTS].sort(
+      (a, b) =>
+        Phaser.Math.Distance.Between(this.player.x, this.player.y, a.x, a.y) -
+        Phaser.Math.Distance.Between(this.player.x, this.player.y, b.x, b.y)
+    );
+    const point = Phaser.Math.RND.pick(sorted.slice(0, 3));
     let x = point.x;
     let y = point.y;
 
@@ -396,10 +448,6 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    const stats = {
-      ...FANTASSIN_STATS,
-      hp: fantassinHpForRound(this.roundManager.getRound()),
-    };
     const emergeMs = point.type === 'ground' ? Phaser.Math.Between(2000, 3000) : 0;
     this.zombies.push(new Zombie(this, x, y, stats, this.pathfinder, emergeMs));
   }
