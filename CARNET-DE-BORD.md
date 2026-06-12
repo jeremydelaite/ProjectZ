@@ -222,6 +222,10 @@ src/
 
 Bestiaire réorganisé en 2 rangées : 4 cartes de zombies + carte de profil.
 
+**Récompense de manche spéciale** : le dernier Gazé lâche une **caisse de
+munitions** (30 s au sol, clignote sur la fin) — la ramasser recomplète la
+réserve de l'arme principale au niveau de l'achat, même pistolet en main.
+
 ---
 
 ## État actuel — où on en est

@@ -157,6 +157,17 @@ export class Player extends Phaser.GameObjects.Container {
     return full < 0 || slot.reserveAmmo >= full;
   }
 
+  /**
+   * Caisse de munitions : recomplète la réserve de l'arme PRINCIPALE au niveau
+   * de l'achat — même si on tient le pistolet. False si pas d'arme principale.
+   */
+  refillMainWeaponAmmo(): boolean {
+    if (this.weapons.length < 2) return false;
+    const slot = this.weapons[1];
+    slot.reserveAmmo = this.fullReserve(slot.def);
+    return true;
+  }
+
   /** Rachat de chargeurs à la caisse : réserve remplie au maximum. */
   refillAmmo(weaponId: string): void {
     const slot = this.weapons.find(w => w.def.id === weaponId);

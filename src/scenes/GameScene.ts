@@ -26,6 +26,7 @@ import {
   ssRatioForRound,
   gazeHpForRound,
   isSpecialRound,
+  AMMO_CRATE_DURATION,
 } from '../config/zombies.config';
 import { Player } from '../entities/Player';
 import { Zombie } from '../entities/Zombie';
@@ -48,6 +49,7 @@ export class GameScene extends Phaser.Scene {
 
   private poisonClouds: { x: number; y: number; until: number; vis: Phaser.GameObjects.Arc }[] = [];
   private poisonTickAccum: number = 0;
+  private ammoCrates: { x: number; y: number; until: number; parts: Phaser.GameObjects.GameObject[] }[] = [];
 
   private points: number = 0;
   private kills: number = 0;
@@ -84,6 +86,7 @@ export class GameScene extends Phaser.Scene {
     this.events.off('gazeExploded', this.onGazeExploded, this);
     this.poisonClouds = [];
     this.poisonTickAccum = 0;
+    this.ammoCrates = [];
 
     // Map du village + grille de pathfinding
     this.physics.world.setBounds(0, 0, MAP_WIDTH, MAP_HEIGHT);
@@ -319,6 +322,66 @@ export class GameScene extends Phaser.Scene {
 
     this.handleInteractions();
     this.updatePoison(time, delta);
+    this.updateAmmoCrates(time);
+  }
+
+  /** Caisses de munitions : expiration + ramassage au contact. */
+  private updateAmmoCrates(time: number): void {
+    this.ammoCrates = this.ammoCrates.filter(c => {
+      if (time >= c.until) {
+        c.parts.forEach(p => p.destroy());
+        return false;
+      }
+      const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, c.x, c.y);
+      if (dist < 40) {
+        const refilled = this.player.refillMainWeaponAmmo();
+        this.floatingText(
+          c.x,
+          c.y - 20,
+          refilled ? 'MUNITIONS !' : 'MUNITIONS (aucune arme principale)',
+          '#ffdd00'
+        );
+        c.parts.forEach(p => p.destroy());
+        return false;
+      }
+      return true;
+    });
+  }
+
+  /** Petit texte qui monte et s'efface. */
+  private floatingText(x: number, y: number, msg: string, color: string): void {
+    const t = this.add
+      .text(x, y, msg, { font: 'bold 16px monospace', color })
+      .setOrigin(0.5)
+      .setDepth(150);
+    this.tweens.add({
+      targets: t,
+      y: y - 46,
+      alpha: 0,
+      duration: 1400,
+      ease: 'Sine.easeOut',
+      onComplete: () => t.destroy(),
+    });
+  }
+
+  /** Le dernier Gazé d'une manche spéciale lâche une caisse de munitions. */
+  private dropAmmoCrate(x: number, y: number): void {
+    const box = this.add.rectangle(x, y, 28, 20, 0x8d6e63).setDepth(7);
+    const stripe = this.add.rectangle(x, y, 28, 6, 0xffdd00).setDepth(7);
+    const parts: Phaser.GameObjects.GameObject[] = [box, stripe];
+
+    // Clignote sur la fin de vie
+    this.tweens.add({
+      targets: parts,
+      alpha: 0.25,
+      duration: 300,
+      yoyo: true,
+      repeat: -1,
+      delay: AMMO_CRATE_DURATION - 5000,
+    });
+
+    this.ammoCrates.push({ x, y, until: this.time.now + AMMO_CRATE_DURATION, parts });
+    this.floatingText(x, y - 24, 'CAISSE DE MUNITIONS', '#ffdd00');
   }
 
   /** Nuages de poison : expiration + dégâts sur la durée au joueur. */
@@ -361,6 +424,14 @@ export class GameScene extends Phaser.Scene {
       repeat: -1,
     });
     this.poisonClouds.push({ x, y, until: this.time.now + POISON_DURATION, vis });
+
+    // Dernier Gazé de la manche spéciale → caisse de munitions
+    if (
+      isSpecialRound(this.roundManager.getRound()) &&
+      this.roundManager.getRemainingInRound() === 0
+    ) {
+      this.dropAmmoCrate(x, y);
+    }
   }
 
   /**
