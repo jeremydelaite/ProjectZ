@@ -47,6 +47,8 @@ export class GameScene extends Phaser.Scene {
   private keyPause!: Phaser.Input.Keyboard.Key;
   private paused: boolean = false;
   private pauseText!: Phaser.GameObjects.Text;
+  private confirmQuit: boolean = false;
+  private confirmUI: Phaser.GameObjects.GameObject[] = [];
 
   constructor() {
     super({ key: 'GameScene' });
@@ -57,6 +59,7 @@ export class GameScene extends Phaser.Scene {
     this.zombies = [];
     this.gameOver = false;
     this.paused = false;
+    this.confirmQuit = false;
     this.points = 0;
     this.kills = 0;
     this.promptOverrideUntil = 0;
@@ -92,13 +95,60 @@ export class GameScene extends Phaser.Scene {
     this.keyInteract = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E);
     this.keyPause = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
 
-    // M : retour au menu (en pause ou au game over)
+    // M : retour au menu — direct au game over (rien à perdre),
+    // avec confirmation depuis la pause (la progression serait perdue)
     this.input.keyboard!.on('keydown-M', () => {
-      if (this.paused || this.gameOver) {
+      if (this.gameOver) {
+        this.physics.resume();
+        this.scene.start('MenuScene');
+      } else if (this.paused && !this.confirmQuit) {
+        this.showQuitConfirm();
+      }
+    });
+    this.input.keyboard!.on('keydown-O', () => {
+      if (this.confirmQuit) {
         this.physics.resume();
         this.scene.start('MenuScene');
       }
     });
+    this.input.keyboard!.on('keydown-N', () => {
+      if (this.confirmQuit) this.hideQuitConfirm();
+    });
+
+    // Modale de confirmation (créée cachée)
+    const dim = this.add
+      .rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.65)
+      .setScrollFactor(0)
+      .setDepth(300);
+    const panel = this.add
+      .rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, 560, 210, 0x161412)
+      .setStrokeStyle(2, 0xff1744)
+      .setScrollFactor(0)
+      .setDepth(301);
+    const confirmText = this.add
+      .text(
+        GAME_WIDTH / 2,
+        GAME_HEIGHT / 2 - 20,
+        'Retourner au menu principal ?\n\nVous perdrez votre progression.',
+        {
+          font: 'bold 20px monospace',
+          color: '#eeeeee',
+          align: 'center',
+        }
+      )
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(301);
+    const confirmKeys = this.add
+      .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 60, 'O — oui   ·   N — non', {
+        font: 'bold 18px monospace',
+        color: '#ffdd00',
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(301);
+    this.confirmUI = [dim, panel, confirmText, confirmKeys];
+    this.confirmUI.forEach(o => (o as Phaser.GameObjects.Rectangle).setVisible(false));
 
     this.pauseText = this.add
       .text(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'PAUSE\n\nÉchap — reprendre\nM — menu principal', {
@@ -171,9 +221,13 @@ export class GameScene extends Phaser.Scene {
   update(time: number, delta: number): void {
     if (this.gameOver) return;
 
-    // Pause (Échap)
+    // Pause (Échap) — ferme d'abord la modale de confirmation si ouverte
     if (Phaser.Input.Keyboard.JustDown(this.keyPause)) {
-      this.togglePause();
+      if (this.confirmQuit) {
+        this.hideQuitConfirm();
+      } else {
+        this.togglePause();
+      }
     }
     if (this.paused) return;
 
@@ -536,6 +590,18 @@ export class GameScene extends Phaser.Scene {
       : `${this.player.getAmmo()}/${this.player.getMagazineSize()} | ${reserveTxt}`;
     const text = `Points : ${this.points}   Kills : ${this.kills}   ${this.player.getWeaponName()} (${this.player.getWeaponCategory()}) : ${ammo}`;
     if (this.hudText.text !== text) this.hudText.setText(text);
+  }
+
+  private showQuitConfirm(): void {
+    this.confirmQuit = true;
+    this.pauseText.setVisible(false);
+    this.confirmUI.forEach(o => (o as Phaser.GameObjects.Rectangle).setVisible(true));
+  }
+
+  private hideQuitConfirm(): void {
+    this.confirmQuit = false;
+    this.confirmUI.forEach(o => (o as Phaser.GameObjects.Rectangle).setVisible(false));
+    this.pauseText.setVisible(this.paused);
   }
 
   private togglePause(): void {

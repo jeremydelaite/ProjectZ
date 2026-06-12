@@ -199,6 +199,8 @@ src/
 - **États de service persistants** (localStorage du navigateur) : meilleure
   manche, kills cumulés, points cumulés, parties jouées — enregistrés à chaque
   game over (`src/systems/Records.ts`)
+- **Modale de confirmation** pour quitter depuis la pause (« Vous perdrez
+  votre progression » — O/N, Échap annule) ; au game over M reste direct
 
 ---
 
