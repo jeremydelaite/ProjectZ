@@ -13,10 +13,15 @@ export class Player extends Phaser.GameObjects.Container {
   declare body: Phaser.Physics.Arcade.Body;
 
   private stats: Stats = {
-    hp: 100,
-    maxHp: 100,
+    hp: 80,    // 4 coups de Fantassin (20 dégâts)
+    maxHp: 80,
     speed: 200,
   };
+
+  // Régénération style COD : repart N ms après le dernier coup reçu
+  private static readonly REGEN_DELAY = 3000; // ms sans dégât avant régén
+  private static readonly REGEN_RATE = 35;    // PV par seconde (~2,3 s pour tout)
+  private lastDamageTime: number = -Infinity;
 
   // 2 armes max : [0] = arme de poing (toujours là), [1] = arme principale
   private weapons: WeaponSlot[] = [
@@ -199,6 +204,7 @@ export class Player extends Phaser.GameObjects.Container {
 
     this.handleMovement();
     this.handleRotation(pointer);
+    this.handleRegen(time, delta);
     this.handleSwitch();
     this.handleReload(time);
     this.handleShooting(time, pointer);
@@ -231,6 +237,18 @@ export class Player extends Phaser.GameObjects.Container {
   private handleRotation(pointer: Phaser.Input.Pointer): void {
     const angle = Phaser.Math.Angle.Between(this.x, this.y, pointer.worldX, pointer.worldY);
     this.setRotation(angle);
+  }
+
+  /** Régénération : remonte au max quelques secondes après le dernier hit. */
+  private handleRegen(time: number, delta: number): void {
+    if (this.stats.hp >= this.stats.maxHp) return;
+    if (time - this.lastDamageTime < Player.REGEN_DELAY) return;
+
+    this.stats.hp = Math.min(
+      this.stats.maxHp,
+      this.stats.hp + (Player.REGEN_RATE * delta) / 1000
+    );
+    this.drawHpBar();
   }
 
   private handleReload(time: number): void {
@@ -328,6 +346,7 @@ export class Player extends Phaser.GameObjects.Container {
   takeDamage(amount: number): void {
     if (this.isDead) return;
 
+    this.lastDamageTime = this.scene.time.now;
     this.stats.hp = Math.max(0, this.stats.hp - amount);
     this.drawHpBar();
 

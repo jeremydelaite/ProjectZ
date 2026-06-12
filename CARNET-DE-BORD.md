@@ -161,6 +161,11 @@ src/
 - Game over → « clique pour rejouer » (restart propre de la scène, listeners purgés)
 - **Échap** : pause/reprise (physique gelée, overlay PAUSE)
 
+**Vie du joueur — style COD** :
+- PV max 100 → **80** : 4 coups de Fantassin au lieu de 5
+- **Régénération** : 3 s sans dégât → remontée à 35 PV/s (~2,3 s pour tout
+  récupérer) — réglable en tête de `Player.ts` (REGEN_DELAY / REGEN_RATE)
+
 ---
 
 ## État actuel — où on en est
