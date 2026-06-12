@@ -226,7 +226,8 @@ Bestiaire réorganisé en 2 rangées : 4 cartes de zombies + carte de profil.
 munitions** — la ramasser recomplète la réserve de l'arme principale au
 niveau de l'achat, même pistolet en main. Les caisses sont **permanentes**
 tant qu'on ne les utilise pas, **5 max sur la map** (au-delà, la plus
-ancienne s'efface).
+ancienne s'efface). Ramassage **à la touche E** (interaction unifiée avec
+les débris et les armes), pas au contact — on choisit quand consommer.
 
 ---
 

@@ -322,26 +322,6 @@ export class GameScene extends Phaser.Scene {
 
     this.handleInteractions();
     this.updatePoison(time, delta);
-    this.updateAmmoCrates(time);
-  }
-
-  /** Caisses de munitions : ramassage au contact (permanentes sinon). */
-  private updateAmmoCrates(_time: number): void {
-    this.ammoCrates = this.ammoCrates.filter(c => {
-      const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, c.x, c.y);
-      if (dist < 40) {
-        const refilled = this.player.refillMainWeaponAmmo();
-        this.floatingText(
-          c.x,
-          c.y - 20,
-          refilled ? 'MUNITIONS !' : 'MUNITIONS (aucune arme principale)',
-          '#ffdd00'
-        );
-        c.parts.forEach(p => p.destroy());
-        return false;
-      }
-      return true;
-    });
   }
 
   /** Petit texte qui monte et s'efface. */
@@ -524,6 +504,31 @@ export class GameScene extends Phaser.Scene {
             owned
               ? this.player.refillAmmo(ws.weapon.id)
               : this.player.equipWeapon(ws.weapon),
+        },
+        dist
+      );
+    }
+
+    for (const c of this.ammoCrates) {
+      const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, c.x, c.y);
+      const hasMain = this.player.hasMainWeapon();
+      consider(
+        {
+          x: c.x,
+          y: c.y,
+          promptY: c.y - 22,
+          label: hasMain ? 'E — Prendre la caisse de munitions' : 'Caisse de munitions',
+          price: 0,
+          canBuy: hasMain,
+          blockedReason: hasMain
+            ? undefined
+            : 'Aucune arme principale — la caisse ne bouge pas, reviens plus tard',
+          buy: () => {
+            this.player.refillMainWeaponAmmo();
+            this.floatingText(c.x, c.y - 20, 'MUNITIONS !', '#ffdd00');
+            c.parts.forEach(p => p.destroy());
+            this.ammoCrates = this.ammoCrates.filter(k => k !== c);
+          },
         },
         dist
       );
