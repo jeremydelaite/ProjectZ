@@ -132,15 +132,25 @@ export const WEAPON_SPOTS: WeaponSpotDef[] = [
   { x: 950, y: 1110, weaponId: 'fm_24_29' },     // sur la carcasse de char
 ];
 
-// Points d'apparition des zombies : devant les vitraux + brèches du village
-export const SPAWN_POINTS = [
-  { x: 1040, y: 130 },             // devant vitrail nord-ouest
-  { x: 1520, y: 130 },             // devant vitrail nord-est
-  { x: 740, y: 528 },              // devant vitrail ouest
-  { x: 1280, y: 60 },              // brèche nord — lisière de forêt
-  { x: 1280, y: MAP_HEIGHT - 60 }, // brèche sud
-  { x: 60, y: 720 },               // ruelle ouest
-  { x: MAP_WIDTH - 60, y: 720 },   // ruelle est
+// Points d'apparition des zombies, deux types :
+// - 'ground' : le zombie SORT DU SOL sur place (émergence 2-3 s, touchable
+//   mais inactif le temps de s'extraire de son trou)
+// - 'edge'  : il arrive de HORS-MAP par une des 4 entrées cardinales et
+//   entre en marchant par la brèche
+export interface SpawnPointDef {
+  x: number;
+  y: number;
+  type: 'ground' | 'edge';
+}
+
+export const SPAWN_POINTS: SpawnPointDef[] = [
+  { x: 1040, y: 130, type: 'ground' },           // devant vitrail nord-ouest
+  { x: 1520, y: 130, type: 'ground' },           // devant vitrail nord-est
+  { x: 740, y: 528, type: 'ground' },            // devant vitrail ouest
+  { x: 1280, y: -40, type: 'edge' },             // entrée nord — lisière de forêt
+  { x: 1280, y: MAP_HEIGHT + 40, type: 'edge' }, // entrée sud
+  { x: -40, y: 720, type: 'edge' },              // ruelle ouest
+  { x: MAP_WIDTH + 40, y: 720, type: 'edge' },   // ruelle est
 ];
 
 export const SPAWN_JITTER = 40; // dispersion aléatoire autour du point

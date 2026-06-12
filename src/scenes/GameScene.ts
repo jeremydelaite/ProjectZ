@@ -200,6 +200,7 @@ export class GameScene extends Phaser.Scene {
       const a = za as Zombie;
       const b = zb as Zombie;
       if (a === b || !a.isAlive() || !b.isAlive()) return;
+      if (a.isEmerging() || b.isEmerging()) return;
 
       const dx = b.x - a.x;
       const dy = b.y - a.y;
@@ -367,21 +368,31 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  /** Spawn un Fantassin à un point d'apparition aléatoire. */
+  /** Spawn un Fantassin : sortie de terre (ground) ou entrée cardinale (edge). */
   private spawnZombie(): void {
     if (this.gameOver) return;
 
     const point = Phaser.Math.RND.pick(SPAWN_POINTS);
     let x = point.x;
     let y = point.y;
-    // Jitter revalidé contre la grille : jamais de spawn dans un mur
-    for (let i = 0; i < 5; i++) {
-      const jx = point.x + Phaser.Math.Between(-SPAWN_JITTER, SPAWN_JITTER);
-      const jy = point.y + Phaser.Math.Between(-SPAWN_JITTER, SPAWN_JITTER);
-      if (!this.pathfinder.isBlockedAt(jx, jy)) {
-        x = jx;
-        y = jy;
-        break;
+
+    if (point.type === 'edge') {
+      // Hors-map : jitter uniquement le long de la brèche
+      if (point.y < 0 || point.y > MAP_HEIGHT) {
+        x += Phaser.Math.Between(-SPAWN_JITTER, SPAWN_JITTER);
+      } else {
+        y += Phaser.Math.Between(-SPAWN_JITTER, SPAWN_JITTER);
+      }
+    } else {
+      // Sortie de terre : jitter revalidé contre la grille (jamais dans un mur)
+      for (let i = 0; i < 5; i++) {
+        const jx = point.x + Phaser.Math.Between(-SPAWN_JITTER, SPAWN_JITTER);
+        const jy = point.y + Phaser.Math.Between(-SPAWN_JITTER, SPAWN_JITTER);
+        if (!this.pathfinder.isBlockedAt(jx, jy)) {
+          x = jx;
+          y = jy;
+          break;
+        }
       }
     }
 
@@ -389,7 +400,8 @@ export class GameScene extends Phaser.Scene {
       ...FANTASSIN_STATS,
       hp: fantassinHpForRound(this.roundManager.getRound()),
     };
-    this.zombies.push(new Zombie(this, x, y, stats, this.pathfinder));
+    const emergeMs = point.type === 'ground' ? Phaser.Math.Between(2000, 3000) : 0;
+    this.zombies.push(new Zombie(this, x, y, stats, this.pathfinder, emergeMs));
   }
 
   private onRoundStarted(round: number): void {

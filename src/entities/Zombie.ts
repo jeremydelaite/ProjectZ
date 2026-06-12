@@ -27,6 +27,10 @@ export class Zombie extends Phaser.GameObjects.Container {
   private lastPos = new Phaser.Math.Vector2(0, 0);
   private stuckMs: number = 0;
 
+  // Sortie de terre : touchable mais inactif jusqu'à cette date
+  private emergeUntil: number = 0;
+  private hole?: Phaser.GameObjects.Ellipse;
+
   // Visuel placeholder (même style que Player)
   private body_rect: Phaser.GameObjects.Rectangle;
   private hpBar: Phaser.GameObjects.Graphics;
@@ -36,7 +40,8 @@ export class Zombie extends Phaser.GameObjects.Container {
     x: number,
     y: number,
     stats: ZombieStats = FANTASSIN_STATS,
-    pathfinder?: Pathfinder
+    pathfinder?: Pathfinder,
+    emergeMs: number = 0
   ) {
     super(scene, x, y);
 
@@ -66,6 +71,21 @@ export class Zombie extends Phaser.GameObjects.Container {
     this.setDepth(5);
 
     this.drawHpBar();
+
+    // Sortie de terre : trou sombre + le zombie s'extrait progressivement
+    if (emergeMs > 0) {
+      this.emergeUntil = scene.time.now + emergeMs;
+      this.hole = scene.add.ellipse(x, y + 8, 36, 18, 0x100e0c).setDepth(4);
+      this.setScale(0.35);
+      this.setAlpha(0.5);
+      scene.tweens.add({
+        targets: this,
+        scale: 1,
+        alpha: 1,
+        duration: emergeMs,
+        ease: 'Sine.easeOut',
+      });
+    }
   }
 
   private drawHpBar(): void {
@@ -83,6 +103,22 @@ export class Zombie extends Phaser.GameObjects.Container {
 
   update(time: number, delta: number, player: Player): void {
     if (this.isDead) return;
+
+    // En train de sortir du sol : touchable mais inerte
+    if (time < this.emergeUntil) {
+      this.body.setVelocity(0, 0);
+      return;
+    }
+    if (this.hole) {
+      const hole = this.hole;
+      this.hole = undefined;
+      this.scene.tweens.add({
+        targets: hole,
+        alpha: 0,
+        duration: 600,
+        onComplete: () => hole.destroy(),
+      });
+    }
 
     if (!player.isAlive()) {
       this.body.setVelocity(0, 0);
@@ -186,9 +222,15 @@ export class Zombie extends Phaser.GameObjects.Container {
     this.lastPos.set(this.x, this.y);
   }
 
+  /** Encore en train de sortir de son trou ? */
+  isEmerging(): boolean {
+    return this.scene.time.now < this.emergeUntil;
+  }
+
   /** Appelé par la scène quand le zombie touche le joueur. */
   tryAttack(player: Player, time: number): void {
     if (this.isDead) return;
+    if (this.isEmerging()) return;
     if (time - this.lastAttack < this.stats.attackCooldown) return;
 
     this.lastAttack = time;
@@ -216,6 +258,10 @@ export class Zombie extends Phaser.GameObjects.Container {
   private die(): void {
     this.isDead = true;
     this.body.enable = false;
+    if (this.hole) {
+      this.hole.destroy();
+      this.hole = undefined;
+    }
     this.scene.events.emit('zombieKilled');
 
     // Petit fondu avant destruction

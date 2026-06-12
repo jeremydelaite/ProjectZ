@@ -169,6 +169,13 @@ src/
   (visée ok) — le clic sur « rejouer » ne part plus en coup de feu, et il faut
   relâcher le clic avant de pouvoir tirer
 
+**Spawns v2 — mise en scène des apparitions** :
+- **Sortie de terre** (points devant les vitraux) : trou sombre au sol, le
+  zombie s'extrait en 2-3 s — touchable pendant l'émergence mais inerte
+  (ne bouge pas, n'attaque pas, n'est pas bousculé par les autres)
+- **Entrées cardinales** (4 brèches) : spawn HORS-map, le zombie entre en
+  marchant par la brèche — plus aucune apparition « pop » visible
+
 ---
 
 ## État actuel — où on en est
