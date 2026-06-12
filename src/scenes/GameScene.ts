@@ -10,10 +10,13 @@ import {
 } from '../config/map.config';
 import {
   FANTASSIN_STATS,
+  COUREUR_STATS,
   POINTS_PER_HIT,
   POINTS_PER_KILL,
   DYNAMIC_SPAWN_CHANCE,
   fantassinHpForRound,
+  coureurHpForRound,
+  coureurRatioForRound,
 } from '../config/zombies.config';
 import { Player } from '../entities/Player';
 import { Zombie } from '../entities/Zombie';
@@ -402,10 +405,12 @@ export class GameScene extends Phaser.Scene {
   private spawnZombie(): void {
     if (this.gameOver) return;
 
-    const stats = {
-      ...FANTASSIN_STATS,
-      hp: fantassinHpForRound(this.roundManager.getRound()),
-    };
+    // Fantassin ou Coureur (villageois rapide, manche 4+, plafonné à 25 %)
+    const round = this.roundManager.getRound();
+    const stats =
+      Math.random() < coureurRatioForRound(round)
+        ? { ...COUREUR_STATS, hp: coureurHpForRound(round) }
+        : { ...FANTASSIN_STATS, hp: fantassinHpForRound(round) };
 
     // Sortie de terre dynamique juste hors champ (réduit le temps de trajet,
     // surtout quand le joueur est retranché dans l'église)

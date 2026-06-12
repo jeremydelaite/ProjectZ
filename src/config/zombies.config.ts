@@ -3,11 +3,36 @@ import { ZombieStats } from '../types';
 // 🧟 Le Fantassin — zombie de base (Issue #4)
 // Soldat de la Wehrmacht réanimé. Lent, peu de PV, toujours majoritaire.
 export const FANTASSIN_STATS: ZombieStats = {
+  kind: 'fantassin',
   hp: 50,              // PV à la manche 1 (scalés via fantassinHpForRound)
   speed: 60,           // marche traînante (joueur : 200)
   damage: 20,          // dégâts par coup
   attackCooldown: 1000, // ms entre deux coups
 };
+
+// 🏃 Le Coureur — villageois fraîchement infecté
+// Zombie « frais », rapide, en tenue civile. Force à prioriser les cibles.
+export const COUREUR_STATS: ZombieStats = {
+  kind: 'coureur',
+  hp: 35,               // 70 % du Fantassin (scalés via coureurHpForRound)
+  speed: 130,           // course (joueur : 200)
+  damage: 15,
+  attackCooldown: 1000,
+};
+
+/**
+ * Proportion de Coureurs dans les spawns : apparaît à la manche 4 (5 %),
+ * +2,5 % par manche, plafonnée à 25 %.
+ */
+export function coureurRatioForRound(round: number): number {
+  if (round < 4) return 0;
+  return Math.min(0.25, 0.05 + (round - 4) * 0.025);
+}
+
+/** PV du Coureur : 70 % de ceux du Fantassin à la même manche. */
+export function coureurHpForRound(round: number): number {
+  return Math.round(fantassinHpForRound(round) * 0.7);
+}
 
 // Points (style COD Zombies)
 export const POINTS_PER_HIT = 10;  // balle qui touche

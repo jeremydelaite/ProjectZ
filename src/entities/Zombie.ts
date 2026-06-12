@@ -50,10 +50,12 @@ export class Zombie extends Phaser.GameObjects.Container {
     this.maxHp = stats.hp;
     this.pathfinder = pathfinder;
 
-    // Corps feldgrau (uniforme Wehrmacht en lambeaux)
-    this.body_rect = scene.add.rectangle(0, 0, 26, 26, 0x5c6b46);
-    // Casque
-    const helmet = scene.add.rectangle(0, -9, 28, 8, 0x3e4a30);
+    const isCoureur = stats.kind === 'coureur';
+    // Fantassin : uniforme feldgrau + casque · Coureur : villageois en civil
+    this.body_rect = scene.add.rectangle(0, 0, 26, 26, isCoureur ? 0x9c8468 : 0x5c6b46);
+    const helmet = isCoureur
+      ? scene.add.rectangle(0, -9, 20, 7, 0x4e342e) // cheveux, pas de casque
+      : scene.add.rectangle(0, -9, 28, 8, 0x3e4a30);
     // Yeux rouges — lisibilité : c'est un ennemi
     const eyeL = scene.add.rectangle(-5, -1, 4, 4, 0xff1744);
     const eyeR = scene.add.rectangle(5, -1, 4, 4, 0xff1744);

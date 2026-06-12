@@ -182,12 +182,22 @@ src/
   traversent toute la map — la pression arrive vite, où qu'on soit.
   Réglage : `DYNAMIC_SPAWN_CHANCE` dans `zombies.config.ts`
 
+### Session 6 — Le Coureur (2e type de zombie)
+
+- **🏃 Le Coureur** : villageois fraîchement infecté, en tenue civile (visuel
+  brun clair, cheveux, pas de casque) — 70 % des PV du Fantassin, **vitesse
+  130** (Fantassin : 60, joueur : 200), 15 dégâts
+- Apparaît à la **manche 4** (5 % des spawns), +2,5 %/manche, **plafond 25 %**
+  — réglable via `coureurRatioForRound()` dans `zombies.config.ts`
+- Même IA (A*, convergence), mêmes mécaniques (perforation, émergence…) :
+  seul le profil change. Force à prioriser les cibles dans la horde.
+
 ---
 
 ## État actuel — où on en est
 
 ✅ Joueur complet (déplacement, tir, PV, rechargement)
-✅ Fantassin avec pathfinding A*
+✅ Fantassin + Coureur (manche 4+) avec pathfinding A*
 ✅ Manches avec scaling (zombies + PV) et cadence progressive
 ✅ Map village + grande église de départ, vitraux, 2 sorties à déblayer (750 pts)
 ✅ Points, kills, HUD, game over avec score
