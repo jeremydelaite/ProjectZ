@@ -202,12 +202,32 @@ src/
 - **Modale de confirmation** pour quitter depuis la pause (« Vous perdrez
   votre progression » — O/N, Échap annule) ; au game over M reste direct
 
+### Session 7 — Le soldat SS et le Gazé (4 types de zombies)
+
+**💀 Le soldat SS** (décisions actées avec Jerem) :
+- Manche 6+, remplace progressivement le Fantassin : 10 % puis +8 %/manche,
+  **plafond 85 %** — dans les hautes manches la Wehrmacht a presque disparu
+- +20 % PV du Fantassin, **25 dégâts**, vitesse 130 — uniforme noir
+- Au passage : le **Coureur passe à 175** de vitesse (joueur : 200)
+
+**☠️ Le Gazé + manches spéciales** :
+- Toutes les 5 manches (5, 10, 15…) : manche **100 % Gazés**, annonce verte
+  « MANCHE X : GAZ ! » — à la manière des manches de chiens de COD
+- 60 % des PV du Fantassin, vitesse 90 mais **démarche erratique** (oscille,
+  difficile à viser), silhouette difforme entourée d'un nuage verdâtre
+- **Explose à la mort OU au contact** (au contact : pas de points) → nuage
+  de poison de 4 s, **10 dégâts/s** dans la zone. Règle d'or : tuer À DISTANCE
+- Réglages : POISON_DPS / POISON_DURATION / POISON_RADIUS, ssRatioForRound()
+  dans `zombies.config.ts`
+
+Bestiaire réorganisé en 2 rangées : 4 cartes de zombies + carte de profil.
+
 ---
 
 ## État actuel — où on en est
 
 ✅ Joueur complet (déplacement, tir, PV, rechargement)
-✅ Fantassin + Coureur (manche 4+) avec pathfinding A*
+✅ 4 zombies : Fantassin, Coureur (m4+), SS (m6+, →85 %), Gazé (manches /5)
 ✅ Manches avec scaling (zombies + PV) et cadence progressive
 ✅ Map village + grande église de départ, vitraux, 2 sorties à déblayer (750 pts)
 ✅ Points, kills, HUD, game over avec score

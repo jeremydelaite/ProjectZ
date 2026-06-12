@@ -11,12 +11,21 @@ import {
 import {
   FANTASSIN_STATS,
   COUREUR_STATS,
+  SS_STATS,
+  GAZE_STATS,
   POINTS_PER_HIT,
   POINTS_PER_KILL,
   DYNAMIC_SPAWN_CHANCE,
+  POISON_DPS,
+  POISON_DURATION,
+  POISON_RADIUS,
   fantassinHpForRound,
   coureurHpForRound,
   coureurRatioForRound,
+  ssHpForRound,
+  ssRatioForRound,
+  gazeHpForRound,
+  isSpecialRound,
 } from '../config/zombies.config';
 import { Player } from '../entities/Player';
 import { Zombie } from '../entities/Zombie';
@@ -36,6 +45,9 @@ export class GameScene extends Phaser.Scene {
   private pathfinder!: Pathfinder;
   private roundManager!: RoundManager;
   private gameOver: boolean = false;
+
+  private poisonClouds: { x: number; y: number; until: number; vis: Phaser.GameObjects.Arc }[] = [];
+  private poisonTickAccum: number = 0;
 
   private points: number = 0;
   private kills: number = 0;
@@ -69,6 +81,9 @@ export class GameScene extends Phaser.Scene {
     this.events.off('zombieKilled', this.onZombieKilled, this);
     this.events.off('roundStarted', this.onRoundStarted, this);
     this.events.off('roundEnded', this.onRoundEnded, this);
+    this.events.off('gazeExploded', this.onGazeExploded, this);
+    this.poisonClouds = [];
+    this.poisonTickAccum = 0;
 
     // Map du village + grille de pathfinding
     this.physics.world.setBounds(0, 0, MAP_WIDTH, MAP_HEIGHT);
@@ -197,6 +212,7 @@ export class GameScene extends Phaser.Scene {
     this.events.on('zombieKilled', this.onZombieKilled, this);
     this.events.on('roundStarted', this.onRoundStarted, this);
     this.events.on('roundEnded', this.onRoundEnded, this);
+    this.events.on('gazeExploded', this.onGazeExploded, this);
 
     // Manches
     this.roundManager = new RoundManager(
@@ -302,6 +318,49 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.handleInteractions();
+    this.updatePoison(time, delta);
+  }
+
+  /** Nuages de poison : expiration + dégâts sur la durée au joueur. */
+  private updatePoison(time: number, delta: number): void {
+    this.poisonClouds = this.poisonClouds.filter(c => {
+      if (time < c.until) return true;
+      this.tweens.add({
+        targets: c.vis,
+        alpha: 0,
+        duration: 400,
+        onComplete: () => c.vis.destroy(),
+      });
+      return false;
+    });
+
+    const inPoison = this.poisonClouds.some(
+      c => Phaser.Math.Distance.Between(this.player.x, this.player.y, c.x, c.y) < POISON_RADIUS
+    );
+
+    if (inPoison) {
+      this.poisonTickAccum += delta;
+      // Dégâts par demi-secondes : POISON_DPS/s au total
+      while (this.poisonTickAccum >= 500) {
+        this.poisonTickAccum -= 500;
+        this.player.takeDamage(POISON_DPS / 2);
+      }
+    } else {
+      this.poisonTickAccum = 0;
+    }
+  }
+
+  /** Explosion d'un Gazé : nuage de poison persistant. */
+  private onGazeExploded(x: number, y: number): void {
+    const vis = this.add.circle(x, y, POISON_RADIUS, 0x76ff03, 0.22).setDepth(6);
+    this.tweens.add({
+      targets: vis,
+      alpha: 0.34,
+      duration: 500,
+      yoyo: true,
+      repeat: -1,
+    });
+    this.poisonClouds.push({ x, y, until: this.time.now + POISON_DURATION, vis });
   }
 
   /**
@@ -468,12 +527,21 @@ export class GameScene extends Phaser.Scene {
   private spawnZombie(): void {
     if (this.gameOver) return;
 
-    // Fantassin ou Coureur (villageois rapide, manche 4+, plafonné à 25 %)
+    // Composition de la horde :
+    // - manches spéciales (5, 10, 15…) : 100 % Gazés
+    // - sinon : Coureurs (manche 4+, ≤25 %), puis SS qui remplacent
+    //   progressivement les Fantassins (manche 6+, jusqu'à 85 %)
     const round = this.roundManager.getRound();
-    const stats =
-      Math.random() < coureurRatioForRound(round)
-        ? { ...COUREUR_STATS, hp: coureurHpForRound(round) }
-        : { ...FANTASSIN_STATS, hp: fantassinHpForRound(round) };
+    let stats;
+    if (isSpecialRound(round)) {
+      stats = { ...GAZE_STATS, hp: gazeHpForRound(round) };
+    } else if (Math.random() < coureurRatioForRound(round)) {
+      stats = { ...COUREUR_STATS, hp: coureurHpForRound(round) };
+    } else if (Math.random() < ssRatioForRound(round)) {
+      stats = { ...SS_STATS, hp: ssHpForRound(round) };
+    } else {
+      stats = { ...FANTASSIN_STATS, hp: fantassinHpForRound(round) };
+    }
 
     // Sortie de terre dynamique juste hors champ (réduit le temps de trajet,
     // surtout quand le joueur est retranché dans l'église)
@@ -523,12 +591,18 @@ export class GameScene extends Phaser.Scene {
   private onRoundStarted(round: number): void {
     this.updateRoundHud();
 
+    const special = isSpecialRound(round);
     // Annonce centrale qui s'estompe
     const announce = this.add
-      .text(GAME_WIDTH / 2, GAME_HEIGHT / 3, `— MANCHE ${round} —`, {
-        font: 'bold 48px monospace',
-        color: '#ff1744',
-      })
+      .text(
+        GAME_WIDTH / 2,
+        GAME_HEIGHT / 3,
+        special ? `— MANCHE ${round} : GAZ ! —` : `— MANCHE ${round} —`,
+        {
+          font: 'bold 48px monospace',
+          color: special ? '#76ff03' : '#ff1744',
+        }
+      )
       .setOrigin(0.5)
       .setScrollFactor(0)
       .setDepth(150)

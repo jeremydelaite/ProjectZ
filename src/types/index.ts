@@ -5,7 +5,7 @@ export interface Stats {
 }
 
 export interface ZombieStats {
-  kind: 'fantassin' | 'coureur';
+  kind: 'fantassin' | 'coureur' | 'ss' | 'gaze';
   hp: number;
   speed: number;
   damage: number;

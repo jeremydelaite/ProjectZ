@@ -15,10 +15,61 @@ export const FANTASSIN_STATS: ZombieStats = {
 export const COUREUR_STATS: ZombieStats = {
   kind: 'coureur',
   hp: 35,               // 70 % du Fantassin (scalés via coureurHpForRound)
-  speed: 130,           // course (joueur : 200)
+  speed: 175,           // course rapide, juste sous le joueur (200)
   damage: 15,
   attackCooldown: 1000,
 };
+
+// 💀 Le soldat SS — relève de la Wehrmacht
+// Plus costaud et aussi rapide qu'un sprint de civil : il remplace
+// progressivement le Fantassin à partir de la manche 6.
+export const SS_STATS: ZombieStats = {
+  kind: 'ss',
+  hp: 60,               // +20 % du Fantassin (scalés via ssHpForRound)
+  speed: 130,
+  damage: 25,
+  attackCooldown: 1000,
+};
+
+// ☠️ Le Gazé — victime des gaz de combat
+// Silhouette difforme, démarche erratique. Explose à la mort OU au contact :
+// nuage de poison qui fait des dégâts sur la durée. À tuer À DISTANCE.
+export const GAZE_STATS: ZombieStats = {
+  kind: 'gaze',
+  hp: 30,               // 60 % du Fantassin (scalés via gazeHpForRound)
+  speed: 90,            // moyenne, mais trajectoire erratique
+  damage: 0,            // pas de coup : il explose au contact
+  attackCooldown: 1000,
+};
+
+// Nuage de poison laissé par l'explosion d'un Gazé
+export const POISON_DPS = 10;        // dégâts par seconde dans la zone
+export const POISON_DURATION = 4000; // ms de vie du nuage
+export const POISON_RADIUS = 90;     // rayon du nuage
+
+/** Manche spéciale 100 % Gazés toutes les 5 manches (5, 10, 15…). */
+export function isSpecialRound(round: number): boolean {
+  return round >= 5 && round % 5 === 0;
+}
+
+/**
+ * Proportion de SS parmi les fantassins : manche 6 (10 %), +8 %/manche,
+ * plafonnée à 85 % — dans les hautes manches la Wehrmacht a presque disparu.
+ */
+export function ssRatioForRound(round: number): number {
+  if (round < 6) return 0;
+  return Math.min(0.85, 0.10 + (round - 6) * 0.08);
+}
+
+/** PV du SS : 120 % de ceux du Fantassin à la même manche. */
+export function ssHpForRound(round: number): number {
+  return Math.round(fantassinHpForRound(round) * 1.2);
+}
+
+/** PV du Gazé : 60 % de ceux du Fantassin à la même manche. */
+export function gazeHpForRound(round: number): number {
+  return Math.round(fantassinHpForRound(round) * 0.6);
+}
 
 /**
  * Proportion de Coureurs dans les spawns : apparaît à la manche 4 (5 %),

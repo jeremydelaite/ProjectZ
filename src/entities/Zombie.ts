@@ -31,6 +31,9 @@ export class Zombie extends Phaser.GameObjects.Container {
   private emergeUntil: number = 0;
   private hole?: Phaser.GameObjects.Ellipse;
 
+  // Démarche erratique (Gazé)
+  private wobblePhase: number = Math.random() * Math.PI * 2;
+
   // Visuel placeholder (même style que Player)
   private body_rect: Phaser.GameObjects.Rectangle;
   private hpBar: Phaser.GameObjects.Graphics;
@@ -50,19 +53,37 @@ export class Zombie extends Phaser.GameObjects.Container {
     this.maxHp = stats.hp;
     this.pathfinder = pathfinder;
 
-    const isCoureur = stats.kind === 'coureur';
-    // Fantassin : uniforme feldgrau + casque · Coureur : villageois en civil
-    this.body_rect = scene.add.rectangle(0, 0, 26, 26, isCoureur ? 0x9c8468 : 0x5c6b46);
-    const helmet = isCoureur
-      ? scene.add.rectangle(0, -9, 20, 7, 0x4e342e) // cheveux, pas de casque
-      : scene.add.rectangle(0, -9, 28, 8, 0x3e4a30);
+    // Visuel selon le type :
+    // Fantassin : feldgrau + casque · Coureur : civil · SS : uniforme noir
+    // Gazé : difforme, verdâtre, aura de gaz
+    const LOOKS: Record<string, { body: number; head: number; headW: number }> = {
+      fantassin: { body: 0x5c6b46, head: 0x3e4a30, headW: 28 },
+      coureur: { body: 0x9c8468, head: 0x4e342e, headW: 20 },
+      ss: { body: 0x26262e, head: 0x111116, headW: 28 },
+      gaze: { body: 0x86a45a, head: 0x9bbf6a, headW: 16 },
+    };
+    const look = LOOKS[stats.kind];
+
+    const parts: Phaser.GameObjects.GameObject[] = [];
+    if (stats.kind === 'gaze') {
+      // Nuage verdâtre autour de la silhouette
+      parts.push(scene.add.circle(0, 0, 20, 0x76ff03, 0.18));
+    }
+    this.body_rect = scene.add.rectangle(0, 0, 26, 26, look.body);
+    const helmet = scene.add.rectangle(
+      stats.kind === 'gaze' ? 4 : 0, // tête de travers : silhouette difforme
+      -9,
+      look.headW,
+      stats.kind === 'coureur' ? 7 : 8,
+      look.head
+    );
     // Yeux rouges — lisibilité : c'est un ennemi
     const eyeL = scene.add.rectangle(-5, -1, 4, 4, 0xff1744);
     const eyeR = scene.add.rectangle(5, -1, 4, 4, 0xff1744);
     // Barre de vie
     this.hpBar = scene.add.graphics();
 
-    this.add([this.body_rect, helmet, eyeL, eyeR, this.hpBar]);
+    this.add([...parts, this.body_rect, helmet, eyeL, eyeR, this.hpBar]);
 
     scene.add.existing(this);
     scene.physics.add.existing(this);
@@ -179,7 +200,11 @@ export class Zombie extends Phaser.GameObjects.Container {
     let desiredX = 0;
     let desiredY = 0;
     if (hasTarget) {
-      const angle = Phaser.Math.Angle.Between(this.x, this.y, targetX, targetY);
+      let angle = Phaser.Math.Angle.Between(this.x, this.y, targetX, targetY);
+      // Gazé : démarche erratique, difficile à viser
+      if (this.stats.kind === 'gaze') {
+        angle += Math.sin(time * 0.005 + this.wobblePhase) * 0.6;
+      }
       desiredX = Math.cos(angle) * this.stats.speed;
       desiredY = Math.sin(angle) * this.stats.speed;
     }
@@ -233,10 +258,38 @@ export class Zombie extends Phaser.GameObjects.Container {
   tryAttack(player: Player, time: number): void {
     if (this.isDead) return;
     if (this.isEmerging()) return;
+
+    // Le Gazé n'attaque pas : il explose au contact (sans rapporter de points)
+    if (this.stats.kind === 'gaze') {
+      this.explode(false);
+      return;
+    }
+
     if (time - this.lastAttack < this.stats.attackCooldown) return;
 
     this.lastAttack = time;
     player.takeDamage(this.stats.damage);
+  }
+
+  /** Explosion du Gazé : nuage de poison géré par la scène. */
+  private explode(rewardKill: boolean): void {
+    if (this.isDead) return;
+    this.isDead = true;
+    this.body.enable = false;
+    if (this.hole) {
+      this.hole.destroy();
+      this.hole = undefined;
+    }
+    if (rewardKill) this.scene.events.emit('zombieKilled');
+    this.scene.events.emit('gazeExploded', this.x, this.y);
+
+    this.scene.tweens.add({
+      targets: this,
+      alpha: 0,
+      scale: 1.6,
+      duration: 150,
+      onComplete: () => this.destroy(),
+    });
   }
 
   takeDamage(amount: number): void {
@@ -258,6 +311,10 @@ export class Zombie extends Phaser.GameObjects.Container {
   }
 
   private die(): void {
+    if (this.stats.kind === 'gaze') {
+      this.explode(true);
+      return;
+    }
     this.isDead = true;
     this.body.enable = false;
     if (this.hole) {
