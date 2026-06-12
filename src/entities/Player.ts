@@ -40,7 +40,9 @@ export class Player extends Phaser.GameObjects.Container {
 
   private lastFired: number = 0;
   private isDead: boolean = false;
-  private pointerReleased: boolean = true; // pour le tir semi-auto
+  // false au départ : la toute première balle exige un clic frais
+  // (le clic qui a lancé la partie ne compte pas)
+  private pointerReleased: boolean = false;
 
   // Rechargement (réserve illimitée, mais changer de chargeur prend du temps)
   private isReloading: boolean = false;
