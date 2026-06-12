@@ -21,6 +21,11 @@ export class Zombie extends Phaser.GameObjects.Container {
   private pathfinder?: Pathfinder;
   private path: Phaser.Math.Vector2[] = [];
   private nextRepath: number = 0;
+  private pathTarget = new Phaser.Math.Vector2(0, 0); // position du joueur au dernier calcul
+
+  // Anti-enlisement
+  private lastPos = new Phaser.Math.Vector2(0, 0);
+  private stuckMs: number = 0;
 
   // Visuel placeholder (même style que Player)
   private body_rect: Phaser.GameObjects.Rectangle;
@@ -76,7 +81,7 @@ export class Zombie extends Phaser.GameObjects.Container {
     this.hpBar.fillRect(-w / 2, -22, w * ratio, 3);
   }
 
-  update(time: number, _delta: number, player: Player): void {
+  update(time: number, delta: number, player: Player): void {
     if (this.isDead) return;
 
     if (!player.isAlive()) {
@@ -84,25 +89,31 @@ export class Zombie extends Phaser.GameObjects.Container {
       return;
     }
 
-    // Cible : le joueur en ligne droite si rien ne gêne, sinon le prochain
-    // point du chemin A*.
+    // 1) Choix de la cible : ligne droite si la voie est dégagée pour tout
+    //    le corps, sinon chemin A* (détour le plus court, ex. via un vitrail).
     let targetX = player.x;
     let targetY = player.y;
+    let hasTarget = true;
 
-    if (
-      this.pathfinder &&
-      !this.pathfinder.hasLineOfSight(this.x, this.y, player.x, player.y, LOS_RADIUS)
-    ) {
-      if (time >= this.nextRepath) {
+    const directSight =
+      !this.pathfinder ||
+      this.pathfinder.hasLineOfSight(this.x, this.y, player.x, player.y, LOS_RADIUS);
+
+    if (!directSight && this.pathfinder) {
+      const playerMoved =
+        Phaser.Math.Distance.Between(player.x, player.y, this.pathTarget.x, this.pathTarget.y) > 64;
+
+      if (time >= this.nextRepath || (playerMoved && this.path.length === 0)) {
         // Repath étalé dans le temps pour lisser la charge CPU
         this.nextRepath = time + 400 + Math.random() * 400;
         this.path = this.pathfinder.findPath(this.x, this.y, player.x, player.y) ?? [];
+        this.pathTarget.set(player.x, player.y);
       }
 
       // Avancer dans le chemin : points atteints, et raccourcis à vue (épaisse)
       while (
         this.path.length > 0 &&
-        Phaser.Math.Distance.Between(this.x, this.y, this.path[0].x, this.path[0].y) < 12
+        Phaser.Math.Distance.Between(this.x, this.y, this.path[0].x, this.path[0].y) < 14
       ) {
         this.path.shift();
       }
@@ -116,30 +127,63 @@ export class Zombie extends Phaser.GameObjects.Container {
       if (this.path.length > 0) {
         targetX = this.path[0].x;
         targetY = this.path[0].y;
+      } else {
+        // Aucun chemin valide : on NE presse PAS l'obstacle. On s'arrête
+        // et on retentera un calcul très vite.
+        hasTarget = false;
+        this.nextRepath = Math.min(this.nextRepath, time + 250);
       }
     } else {
       this.path = [];
     }
 
-    const angle = Phaser.Math.Angle.Between(this.x, this.y, targetX, targetY);
+    // 2) Vélocité désirée, avec virage lissé (pas de demi-tour sec)
+    let desiredX = 0;
+    let desiredY = 0;
+    if (hasTarget) {
+      const angle = Phaser.Math.Angle.Between(this.x, this.y, targetX, targetY);
+      desiredX = Math.cos(angle) * this.stats.speed;
+      desiredY = Math.sin(angle) * this.stats.speed;
+    }
+    const t = Math.min(1, delta / 120); // constante de lissage
     this.body.setVelocity(
-      Math.cos(angle) * this.stats.speed,
-      Math.sin(angle) * this.stats.speed
+      this.body.velocity.x + (desiredX - this.body.velocity.x) * t,
+      this.body.velocity.y + (desiredY - this.body.velocity.y) * t
     );
 
-    // Filet de sécurité : si malgré tout bloqué contre un mur, glisser le long
-    // et recalculer un chemin immédiatement (au lieu d'attendre le prochain repath)
+    // 3) Bloqué contre un mur : repath rapide + glissement le long
     const blocked = this.body.blocked;
     if (blocked.left || blocked.right || blocked.up || blocked.down) {
       this.nextRepath = Math.min(this.nextRepath, time + 50 + Math.random() * 100);
+      if (blocked.left || blocked.right) {
+        const dirY = Math.sign(targetY - this.y) || 1;
+        this.body.setVelocity(0, dirY * this.stats.speed);
+      } else {
+        const dirX = Math.sign(targetX - this.x) || 1;
+        this.body.setVelocity(dirX * this.stats.speed, 0);
+      }
     }
-    if (blocked.left || blocked.right) {
-      const dirY = Math.sign(targetY - this.y) || 1;
-      this.body.setVelocity(0, dirY * this.stats.speed);
-    } else if (blocked.up || blocked.down) {
-      const dirX = Math.sign(targetX - this.x) || 1;
-      this.body.setVelocity(dirX * this.stats.speed, 0);
+
+    // 4) Anti-enlisement : si on n'a presque pas bougé depuis ~600 ms alors
+    //    qu'on devrait avancer, on jette le chemin et on recalcule tout de suite
+    if (hasTarget) {
+      const moved = Phaser.Math.Distance.Between(this.x, this.y, this.lastPos.x, this.lastPos.y);
+      const expected = (this.stats.speed * delta) / 1000;
+      if (moved < expected * 0.25) {
+        this.stuckMs += delta;
+      } else {
+        this.stuckMs = 0;
+      }
+      if (this.stuckMs > 600) {
+        this.stuckMs = 0;
+        this.path = [];
+        this.nextRepath = 0;
+        // Petite impulsion latérale pour se décoller du coin
+        const a = Math.atan2(targetY - this.y, targetX - this.x) + (Math.random() < 0.5 ? 1 : -1) * Math.PI / 2;
+        this.body.setVelocity(Math.cos(a) * this.stats.speed, Math.sin(a) * this.stats.speed);
+      }
     }
+    this.lastPos.set(this.x, this.y);
   }
 
   /** Appelé par la scène quand le zombie touche le joueur. */

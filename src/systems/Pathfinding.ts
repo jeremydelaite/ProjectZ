@@ -92,6 +92,33 @@ export class Pathfinder {
     );
   }
 
+  /** Cellule libre la plus proche (anneaux concentriques), ou null. */
+  private nearestFreeCell(
+    cx: number,
+    cy: number,
+    maxRadius: number
+  ): { cx: number; cy: number } | null {
+    for (let r = 1; r <= maxRadius; r++) {
+      let best: { cx: number; cy: number } | null = null;
+      let bestDist = Infinity;
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue; // anneau seulement
+          const nx = cx + dx;
+          const ny = cy + dy;
+          if (this.isBlockedCell(nx, ny)) continue;
+          const d = dx * dx + dy * dy;
+          if (d < bestDist) {
+            bestDist = d;
+            best = { cx: nx, cy: ny };
+          }
+        }
+      }
+      if (best) return best;
+    }
+    return null;
+  }
+
   /**
    * Chemin en coordonnées monde (centres de cellules), ou null si introuvable.
    * La cellule de départ est toujours considérée libre (un zombie peut être
@@ -100,11 +127,20 @@ export class Pathfinder {
   findPath(x1: number, y1: number, x2: number, y2: number): Phaser.Math.Vector2[] | null {
     const sx = Phaser.Math.Clamp(Math.floor(x1 / this.cell), 0, this.cols - 1);
     const sy = Phaser.Math.Clamp(Math.floor(y1 / this.cell), 0, this.rows - 1);
-    const gx = Phaser.Math.Clamp(Math.floor(x2 / this.cell), 0, this.cols - 1);
-    const gy = Phaser.Math.Clamp(Math.floor(y2 / this.cell), 0, this.rows - 1);
+    let gx = Phaser.Math.Clamp(Math.floor(x2 / this.cell), 0, this.cols - 1);
+    let gy = Phaser.Math.Clamp(Math.floor(y2 / this.cell), 0, this.rows - 1);
+
+    // But dans une cellule bloquée (ex. joueur collé à un mur ou à un débris) :
+    // viser la cellule libre la plus proche, sinon les zombies n'auraient
+    // aucun chemin et iraient presser bêtement l'obstacle.
+    if (this.isBlockedCell(gx, gy)) {
+      const free = this.nearestFreeCell(gx, gy, 4);
+      if (!free) return null;
+      gx = free.cx;
+      gy = free.cy;
+    }
 
     if (sx === gx && sy === gy) return [];
-    if (this.isBlockedCell(gx, gy)) return null;
 
     const size = this.cols * this.rows;
     const gScore = new Float64Array(size).fill(Infinity);

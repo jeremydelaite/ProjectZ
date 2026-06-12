@@ -100,6 +100,17 @@ src/
   contournent au lieu de se bloquer mutuellement dans les vitraux.
 - Le jitter de spawn est revalidé contre la grille : plus de spawn dans un mur.
 
+**IA v3 — décisions de design actées avec Jerem** :
+- **Convergence pure style COD** (pas d'encerclement) : tous les zombies visent
+  exactement le joueur → les trains restent un outil de jeu (synergie perforation).
+- **Joueur inaccessible → détour le plus court** : si la cellule du joueur est
+  « bloquée » (collé à un mur/débris), l'A* vise la cellule libre la plus proche.
+  S'il n'existe AUCUN chemin, le zombie s'arrête et retente (il ne presse plus
+  jamais un obstacle). C'était la cause des tas de zombies contre les débris.
+- Virages lissés (plus de demi-tours secs), repath si le joueur s'est déplacé
+  de +64 px, détecteur d'enlisement (bloqué ~600 ms → chemin jeté, recalcul,
+  impulsion latérale pour se décoller).
+
 ---
 
 ## État actuel — où on en est
