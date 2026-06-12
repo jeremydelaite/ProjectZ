@@ -192,6 +192,14 @@ src/
 - Même IA (A*, convergence), mêmes mécaniques (perforation, émergence…) :
   seul le profil change. Force à prioriser les cibles dans la horde.
 
+**Navigation & bestiaire** :
+- **M** : retour au menu principal depuis la pause ou le game over
+- **Bestiaire** (touche B au menu) : cartes Fantassin et Coureur avec visuels
+  et stats, + **carte de profil du Soldat** (PV, régén, vitesse, armes)
+- **États de service persistants** (localStorage du navigateur) : meilleure
+  manche, kills cumulés, points cumulés, parties jouées — enregistrés à chaque
+  game over (`src/systems/Records.ts`)
+
 ---
 
 ## État actuel — où on en est

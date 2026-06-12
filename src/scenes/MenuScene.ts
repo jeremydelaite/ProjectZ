@@ -63,6 +63,14 @@ export class MenuScene extends Phaser.Scene {
       repeat: -1,
     });
 
+    this.add
+      .text(GAME_WIDTH / 2, GAME_HEIGHT - 60, 'B — Bestiaire & profil', {
+        font: '16px monospace',
+        color: '#9e9e9e',
+      })
+      .setOrigin(0.5);
+
     this.input.once('pointerdown', () => this.scene.start('GameScene'));
+    this.input.keyboard!.once('keydown-B', () => this.scene.start('BestiaryScene'));
   }
 }

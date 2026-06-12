@@ -25,6 +25,7 @@ import { RoundManager } from '../systems/RoundManager';
 import { Pathfinder } from '../systems/Pathfinding';
 import { AMMO_REFILL_PRICE } from '../config/weapons.config';
 import { VillageMap } from '../world/VillageMap';
+import { registerGame } from '../systems/Records';
 
 const INTERACT_RANGE = 90; // distance pour interagir (débris, caisses d'armes)
 
@@ -91,8 +92,16 @@ export class GameScene extends Phaser.Scene {
     this.keyInteract = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E);
     this.keyPause = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
 
+    // M : retour au menu (en pause ou au game over)
+    this.input.keyboard!.on('keydown-M', () => {
+      if (this.paused || this.gameOver) {
+        this.physics.resume();
+        this.scene.start('MenuScene');
+      }
+    });
+
     this.pauseText = this.add
-      .text(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'PAUSE\n\nÉchap pour reprendre', {
+      .text(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'PAUSE\n\nÉchap — reprendre\nM — menu principal', {
         font: 'bold 48px monospace',
         color: '#ffdd00',
         align: 'center',
@@ -544,6 +553,13 @@ export class GameScene extends Phaser.Scene {
     this.zombies.forEach(z => z.body && z.body.setVelocity(0, 0));
     this.promptText.setVisible(false);
 
+    // États de service (persistés dans le navigateur)
+    registerGame({
+      round: this.roundManager.getRound(),
+      kills: this.kills,
+      points: this.points,
+    });
+
     this.add
       .text(
         GAME_WIDTH / 2,
@@ -562,7 +578,8 @@ export class GameScene extends Phaser.Scene {
     // Rejouer (petit délai pour ne pas cliquer par accident en tirant)
     this.time.delayedCall(800, () => {
       const replay = this.add
-        .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 90, '— CLIQUE POUR REJOUER —', {
+        .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 90, '— CLIQUE POUR REJOUER —\nM — menu principal', {
+          align: 'center',
           font: 'bold 22px monospace',
           color: '#ffdd00',
         })
