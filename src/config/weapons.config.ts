@@ -109,12 +109,12 @@ export const WEAPONS: Record<string, WeaponDef> = {
     fireRate: 150,
     bulletSpeed: 650,
     bulletLifespan: 1600,  // portée longue
-    magazineSize: 25,
+    magazineSize: 50,
     reloadTime: 2600,
     auto: true,
     pellets: 1,
     spreadDeg: 0,
     price: 3000,
-    reserveMagazines: 4, // 100 balles
+    reserveMagazines: 4, // 200 balles
   },
 };
