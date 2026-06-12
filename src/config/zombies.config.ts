@@ -47,8 +47,10 @@ export const POISON_DPS = 10;        // dégâts par seconde dans la zone
 export const POISON_DURATION = 4000; // ms de vie du nuage
 export const POISON_RADIUS = 90;     // rayon du nuage
 
-// Caisse de munitions lâchée par le dernier Gazé d'une manche spéciale
-export const AMMO_CRATE_DURATION = 30000; // ms avant disparition
+// Caisses de munitions lâchées par le dernier Gazé des manches spéciales :
+// permanentes tant qu'on ne les ramasse pas, mais 5 max sur la map
+// (au-delà, la plus ancienne disparaît)
+export const AMMO_CRATE_MAX = 5;
 
 /** Manche spéciale 100 % Gazés toutes les 5 manches (5, 10, 15…). */
 export function isSpecialRound(round: number): boolean {

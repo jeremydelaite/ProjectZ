@@ -223,8 +223,10 @@ src/
 Bestiaire réorganisé en 2 rangées : 4 cartes de zombies + carte de profil.
 
 **Récompense de manche spéciale** : le dernier Gazé lâche une **caisse de
-munitions** (30 s au sol, clignote sur la fin) — la ramasser recomplète la
-réserve de l'arme principale au niveau de l'achat, même pistolet en main.
+munitions** — la ramasser recomplète la réserve de l'arme principale au
+niveau de l'achat, même pistolet en main. Les caisses sont **permanentes**
+tant qu'on ne les utilise pas, **5 max sur la map** (au-delà, la plus
+ancienne s'efface).
 
 ---
 

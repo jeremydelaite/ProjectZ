@@ -26,7 +26,7 @@ import {
   ssRatioForRound,
   gazeHpForRound,
   isSpecialRound,
-  AMMO_CRATE_DURATION,
+  AMMO_CRATE_MAX,
 } from '../config/zombies.config';
 import { Player } from '../entities/Player';
 import { Zombie } from '../entities/Zombie';
@@ -49,7 +49,7 @@ export class GameScene extends Phaser.Scene {
 
   private poisonClouds: { x: number; y: number; until: number; vis: Phaser.GameObjects.Arc }[] = [];
   private poisonTickAccum: number = 0;
-  private ammoCrates: { x: number; y: number; until: number; parts: Phaser.GameObjects.GameObject[] }[] = [];
+  private ammoCrates: { x: number; y: number; parts: Phaser.GameObjects.GameObject[] }[] = [];
 
   private points: number = 0;
   private kills: number = 0;
@@ -325,13 +325,9 @@ export class GameScene extends Phaser.Scene {
     this.updateAmmoCrates(time);
   }
 
-  /** Caisses de munitions : expiration + ramassage au contact. */
-  private updateAmmoCrates(time: number): void {
+  /** Caisses de munitions : ramassage au contact (permanentes sinon). */
+  private updateAmmoCrates(_time: number): void {
     this.ammoCrates = this.ammoCrates.filter(c => {
-      if (time >= c.until) {
-        c.parts.forEach(p => p.destroy());
-        return false;
-      }
       const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, c.x, c.y);
       if (dist < 40) {
         const refilled = this.player.refillMainWeaponAmmo();
@@ -366,21 +362,21 @@ export class GameScene extends Phaser.Scene {
 
   /** Le dernier Gazé d'une manche spéciale lâche une caisse de munitions. */
   private dropAmmoCrate(x: number, y: number): void {
+    // 5 caisses max sur la map : la plus ancienne disparaît
+    while (this.ammoCrates.length >= AMMO_CRATE_MAX) {
+      const oldest = this.ammoCrates.shift()!;
+      this.tweens.add({
+        targets: oldest.parts,
+        alpha: 0,
+        duration: 500,
+        onComplete: () => oldest.parts.forEach(p => p.destroy()),
+      });
+    }
+
     const box = this.add.rectangle(x, y, 28, 20, 0x8d6e63).setDepth(7);
     const stripe = this.add.rectangle(x, y, 28, 6, 0xffdd00).setDepth(7);
-    const parts: Phaser.GameObjects.GameObject[] = [box, stripe];
 
-    // Clignote sur la fin de vie
-    this.tweens.add({
-      targets: parts,
-      alpha: 0.25,
-      duration: 300,
-      yoyo: true,
-      repeat: -1,
-      delay: AMMO_CRATE_DURATION - 5000,
-    });
-
-    this.ammoCrates.push({ x, y, until: this.time.now + AMMO_CRATE_DURATION, parts });
+    this.ammoCrates.push({ x, y, parts: [box, stripe] });
     this.floatingText(x, y - 24, 'CAISSE DE MUNITIONS', '#ffdd00');
   }
 
