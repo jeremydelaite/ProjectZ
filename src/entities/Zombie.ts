@@ -55,7 +55,9 @@ export class Zombie extends Phaser.GameObjects.Container {
     scene.add.existing(this);
     scene.physics.add.existing(this);
 
+    // Sur un Container, le corps est ancré sur l'origine : il faut le recentrer
     this.body.setSize(24, 24);
+    this.body.setOffset(-12, -12);
     this.setDepth(5);
 
     this.drawHpBar();

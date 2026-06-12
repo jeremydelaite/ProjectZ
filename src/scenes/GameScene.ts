@@ -162,8 +162,28 @@ export class GameScene extends Phaser.Scene {
       (zombie as Zombie).tryAttack(this.player, time);
     });
 
-    // Les zombies ne s'empilent pas
-    this.physics.collide(this.zombies, this.zombies);
+    // Séparation douce entre zombies : ils se contournent au lieu de se
+    // bloquer mutuellement (les collisions dures créaient des bouchons
+    // dans les vitraux et contre les murs)
+    this.physics.overlap(this.zombies, this.zombies, (za, zb) => {
+      const a = za as Zombie;
+      const b = zb as Zombie;
+      if (a === b || !a.isAlive() || !b.isAlive()) return;
+
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const dist = Math.hypot(dx, dy) || 1;
+      const minDist = 24;
+      if (dist >= minDist) return;
+
+      const push = (minDist - dist) * 0.35;
+      const nx = dx / dist;
+      const ny = dy / dist;
+      a.body.x -= nx * push;
+      a.body.y -= ny * push;
+      b.body.x += nx * push;
+      b.body.y += ny * push;
+    });
 
     // Murs : bloquent les zombies, arrêtent les balles
     // (les vitraux ne bloquent ni les zombies ni les balles)
@@ -240,8 +260,18 @@ export class GameScene extends Phaser.Scene {
     if (this.gameOver) return;
 
     const point = Phaser.Math.RND.pick(SPAWN_POINTS);
-    const x = point.x + Phaser.Math.Between(-SPAWN_JITTER, SPAWN_JITTER);
-    const y = point.y + Phaser.Math.Between(-SPAWN_JITTER, SPAWN_JITTER);
+    let x = point.x;
+    let y = point.y;
+    // Jitter revalidé contre la grille : jamais de spawn dans un mur
+    for (let i = 0; i < 5; i++) {
+      const jx = point.x + Phaser.Math.Between(-SPAWN_JITTER, SPAWN_JITTER);
+      const jy = point.y + Phaser.Math.Between(-SPAWN_JITTER, SPAWN_JITTER);
+      if (!this.pathfinder.isBlockedAt(jx, jy)) {
+        x = jx;
+        y = jy;
+        break;
+      }
+    }
 
     const stats = {
       ...FANTASSIN_STATS,

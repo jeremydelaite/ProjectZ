@@ -61,7 +61,9 @@ export class Player extends Phaser.GameObjects.Container {
     scene.add.existing(this);
     scene.physics.add.existing(this);
 
+    // Sur un Container, le corps est ancré sur l'origine : il faut le recentrer
     this.body.setSize(28, 28);
+    this.body.setOffset(-14, -14);
     this.body.setCollideWorldBounds(true);
     this.setDepth(10);
 

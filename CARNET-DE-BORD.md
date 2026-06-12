@@ -91,6 +91,15 @@ src/
 - **Compteur de manche** : « Manche X — N restants » en haut à droite
   (« accalmie » entre les manches).
 
+**Correctif majeur : hitbox centrées + séparation douce** :
+- Les corps physiques des Containers Phaser étaient ancrés sur l'origine au lieu
+  d'être centrés → hitbox décalées d'une demi-largeur en bas-à-droite (visible
+  en debug). C'était LA cause des frottements et des zombies enfoncés dans les
+  murs. Corrigé avec `setOffset(-w/2, -h/2)` sur joueur et zombies.
+- Collisions zombie-zombie remplacées par une séparation douce : ils se
+  contournent au lieu de se bloquer mutuellement dans les vitraux.
+- Le jitter de spawn est revalidé contre la grille : plus de spawn dans un mur.
+
 ---
 
 ## État actuel — où on en est
