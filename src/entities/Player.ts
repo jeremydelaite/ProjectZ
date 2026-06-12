@@ -211,6 +211,12 @@ export class Player extends Phaser.GameObjects.Container {
   update(time: number, delta: number, pointer: Phaser.Input.Pointer): void {
     if (this.isDead) return;
 
+    // Recalcule les coordonnées MONDE du pointeur depuis la caméra courante.
+    // Sans ça, worldX/worldY ne sont rafraîchis qu'au mouvement de la souris :
+    // quand la caméra bouge (lancement, scrolling), la visée reste périmée
+    // (bug du perso bloqué « regard à gauche » après un refresh).
+    pointer.updateWorldPoint(this.scene.cameras.main);
+
     this.handleRotation(pointer);
     this.updateBullets(delta);
     this.drawReloadBar(time);
