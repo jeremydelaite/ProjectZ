@@ -19,6 +19,7 @@ import { Zombie } from '../entities/Zombie';
 import { Bullet } from '../entities/Bullet';
 import { RoundManager } from '../systems/RoundManager';
 import { Pathfinder } from '../systems/Pathfinding';
+import { AMMO_REFILL_PRICE } from '../config/weapons.config';
 import { VillageMap } from '../world/VillageMap';
 
 const INTERACT_RANGE = 90; // distance pour interagir (débris, caisses d'armes)
@@ -266,7 +267,13 @@ export class GameScene extends Phaser.Scene {
       let blockedReason: string | undefined;
 
       if (owned) {
-        label = `${fullName} (déjà équipée)`;
+        // Arme déjà possédée : la caisse vend des chargeurs
+        if (this.player.isReserveFull(ws.weapon.id)) {
+          label = `${fullName} — munitions pleines`;
+        } else {
+          label = `E — Racheter des chargeurs : ${ws.weapon.name} (${AMMO_REFILL_PRICE} pts)`;
+          canBuy = true;
+        }
       } else if (!this.player.hasMainWeapon()) {
         // Emplacement principal libre : achat direct
         label = `E — Acheter : ${fullName} (${ws.weapon.price} pts)`;
@@ -287,10 +294,13 @@ export class GameScene extends Phaser.Scene {
           y: ws.spot.y,
           promptY: ws.spot.y - 26,
           label,
-          price: ws.weapon.price,
+          price: owned ? AMMO_REFILL_PRICE : ws.weapon.price,
           canBuy,
           blockedReason,
-          buy: () => this.player.equipWeapon(ws.weapon),
+          buy: () =>
+            owned
+              ? this.player.refillAmmo(ws.weapon.id)
+              : this.player.equipWeapon(ws.weapon),
         },
         dist
       );
@@ -416,9 +426,11 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateHud(): void {
+    const reserve = this.player.getReserveAmmo();
+    const reserveTxt = reserve < 0 ? '∞' : `${reserve}`;
     const ammo = this.player.isReloadingNow()
       ? 'RECHARGE…'
-      : `${this.player.getAmmo()}/${this.player.getMagazineSize()}`;
+      : `${this.player.getAmmo()}/${this.player.getMagazineSize()} | ${reserveTxt}`;
     const text = `Points : ${this.points}   Kills : ${this.kills}   ${this.player.getWeaponName()} (${this.player.getWeaponCategory()}) : ${ammo}`;
     if (this.hudText.text !== text) this.hudText.setText(text);
   }

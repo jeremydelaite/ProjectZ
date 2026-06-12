@@ -6,6 +6,7 @@ import { WeaponDef, WEAPONS } from '../config/weapons.config';
 interface WeaponSlot {
   def: WeaponDef;
   currentAmmo: number;
+  reserveAmmo: number; // balles en réserve (-1 = illimité, ex. pistolet)
 }
 
 export class Player extends Phaser.GameObjects.Container {
@@ -19,7 +20,11 @@ export class Player extends Phaser.GameObjects.Container {
 
   // 2 armes max : [0] = arme de poing (toujours là), [1] = arme principale
   private weapons: WeaponSlot[] = [
-    { def: WEAPONS.mas_1935a, currentAmmo: WEAPONS.mas_1935a.magazineSize },
+    {
+      def: WEAPONS.mas_1935a,
+      currentAmmo: WEAPONS.mas_1935a.magazineSize,
+      reserveAmmo: -1,
+    },
   ];
   private currentWeapon: number = 0;
 
@@ -91,9 +96,17 @@ export class Player extends Phaser.GameObjects.Container {
     return this.weapons[this.currentWeapon];
   }
 
+  private fullReserve(def: WeaponDef): number {
+    return def.reserveMagazines < 0 ? -1 : def.reserveMagazines * def.magazineSize;
+  }
+
   /** Équipe une arme achetée. Remplace l'arme principale si on en a déjà une. */
   equipWeapon(def: WeaponDef): void {
-    const slot: WeaponSlot = { def, currentAmmo: def.magazineSize };
+    const slot: WeaponSlot = {
+      def,
+      currentAmmo: def.magazineSize,
+      reserveAmmo: this.fullReserve(def),
+    };
     if (this.weapons.length === 1) {
       this.weapons.push(slot);
     } else {
@@ -120,6 +133,21 @@ export class Player extends Phaser.GameObjects.Container {
   /** Nom de l'arme principale actuelle (si elle existe). */
   getMainWeaponName(): string | null {
     return this.weapons.length > 1 ? this.weapons[1].def.name : null;
+  }
+
+  /** La réserve de cette arme est-elle déjà pleine ? */
+  isReserveFull(weaponId: string): boolean {
+    const slot = this.weapons.find(w => w.def.id === weaponId);
+    if (!slot) return false;
+    const full = this.fullReserve(slot.def);
+    return full < 0 || slot.reserveAmmo >= full;
+  }
+
+  /** Rachat de chargeurs à la caisse : réserve remplie au maximum. */
+  refillAmmo(weaponId: string): void {
+    const slot = this.weapons.find(w => w.def.id === weaponId);
+    if (!slot) return;
+    slot.reserveAmmo = this.fullReserve(slot.def);
   }
 
   private handleSwitch(): void {
@@ -206,25 +234,37 @@ export class Player extends Phaser.GameObjects.Container {
   }
 
   private handleReload(time: number): void {
-    // Fin de rechargement
+    // Fin de rechargement : prélever sur la réserve
     if (this.isReloading) {
       if (time - this.reloadStarted >= this.weapon.def.reloadTime) {
         this.isReloading = false;
-        this.weapon.currentAmmo = this.weapon.def.magazineSize;
+        const w = this.weapon;
+        const needed = w.def.magazineSize - w.currentAmmo;
+        if (w.reserveAmmo < 0) {
+          // Réserve illimitée (pistolet)
+          w.currentAmmo = w.def.magazineSize;
+        } else {
+          const taken = Math.min(needed, w.reserveAmmo);
+          w.currentAmmo += taken;
+          w.reserveAmmo -= taken;
+        }
       }
       return;
     }
 
-    // Rechargement manuel (R), seulement si le chargeur n'est pas plein
-    if (
-      Phaser.Input.Keyboard.JustDown(this.keys.reload) &&
-      this.weapon.currentAmmo < this.weapon.def.magazineSize
-    ) {
+    // Rechargement manuel (R)
+    if (Phaser.Input.Keyboard.JustDown(this.keys.reload)) {
       this.startReload(time);
     }
   }
 
+  /** Lance le rechargement si possible (chargeur non plein ET réserve dispo). */
   private startReload(time: number): void {
+    const w = this.weapon;
+    if (this.isReloading) return;
+    if (w.currentAmmo >= w.def.magazineSize) return;
+    if (w.reserveAmmo === 0) return; // à sec : il faut racheter des chargeurs
+
     this.isReloading = true;
     this.reloadStarted = time;
   }
@@ -251,6 +291,11 @@ export class Player extends Phaser.GameObjects.Container {
     this.lastFired = time;
     this.pointerReleased = false;
     w.currentAmmo--;
+
+    // Recharge automatique dès que le chargeur est vide
+    if (w.currentAmmo === 0) {
+      this.startReload(time);
+    }
 
     const baseAngle = Phaser.Math.Angle.Between(
       this.x,
@@ -309,5 +354,7 @@ export class Player extends Phaser.GameObjects.Container {
   getMagazineSize(): number { return this.weapon.def.magazineSize; }
   getWeaponName(): string { return this.weapon.def.name; }
   getWeaponCategory(): string { return this.weapon.def.category; }
+  /** Réserve de l'arme tenue (-1 = illimitée). */
+  getReserveAmmo(): number { return this.weapon.reserveAmmo; }
   isReloadingNow(): boolean { return this.isReloading; }
 }

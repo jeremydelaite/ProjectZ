@@ -16,7 +16,11 @@ export interface WeaponDef {
   pellets: number;        // 1 = balle unique, >1 = gerbe (fusil de chasse)
   spreadDeg: number;      // dispersion totale de la gerbe en degrés
   price: number;          // points (0 = arme de départ)
+  reserveMagazines: number; // chargeurs en réserve quand pleine (-1 = illimité)
 }
+
+// Racheter une réserve complète de chargeurs à la caisse de l'arme
+export const AMMO_REFILL_PRICE = 500;
 
 export const WEAPONS: Record<string, WeaponDef> = {
   // 🔫 Arme de départ — survie de secours, insuffisante vers la manche 4-5
@@ -35,6 +39,7 @@ export const WEAPONS: Record<string, WeaponDef> = {
     pellets: 1,
     spreadDeg: 0,
     price: 0,
+    reserveMagazines: -1, // arme de secours : réserve illimitée
   },
 
   // 🌾 Dégager un couloir, sauver sa peau — risque/récompense au corps à corps
@@ -53,6 +58,7 @@ export const WEAPONS: Record<string, WeaponDef> = {
     pellets: 8,
     spreadDeg: 24,
     price: 750,
+    reserveMagazines: 10, // 20 cartouches
   },
 
   // 🎯 Précision et économie — one-shot les Fantassins pendant longtemps
@@ -71,6 +77,7 @@ export const WEAPONS: Record<string, WeaponDef> = {
     pellets: 1,
     spreadDeg: 0,
     price: 1200,
+    reserveMagazines: 6, // 60 balles
   },
 
   // 💨 Gestion de horde rapprochée, arrosage en reculant
@@ -89,6 +96,7 @@ export const WEAPONS: Record<string, WeaponDef> = {
     pellets: 1,
     spreadDeg: 0,
     price: 1500,
+    reserveMagazines: 4, // 128 balles
   },
 
   // 🔥 L'arme de fin de run — puissante partout, chère, rechargement lent
@@ -107,5 +115,6 @@ export const WEAPONS: Record<string, WeaponDef> = {
     pellets: 1,
     spreadDeg: 0,
     price: 3000,
+    reserveMagazines: 4, // 100 balles
   },
 };

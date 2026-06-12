@@ -146,6 +146,14 @@ src/
   « MAS 38 — Mitraillette », « FM 24/29 — Fusil-mitrailleur »… dans les prompts
   d'achat et le HUD
 
+**Économie de munitions** :
+- Le pistolet garde sa réserve illimitée (arme de secours) ; les armes achetées
+  ont une **réserve limitée** : double canon 10 chargeurs, MAS 40 6, MAS 38 4,
+  FM 24/29 4 — réglable dans `weapons.config.ts`
+- **Recharge automatique** dès que le chargeur tombe à 0 (si réserve dispo)
+- La caisse d'une arme possédée vend la **recharge complète : 500 pts** ;
+  « munitions pleines » si rien à racheter — HUD : `8/8 | ∞` ou `12/32 | 96`
+
 ---
 
 ## État actuel — où on en est
