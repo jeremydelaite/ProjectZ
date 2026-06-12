@@ -4,6 +4,8 @@
 export interface WeaponDef {
   id: string;
   name: string;
+  category: string;       // lisible par tous : « Mitraillette », « Fusil-mitrailleur »…
+  speedMultiplier: number; // vitesse de déplacement en portant l'arme (1 = normale)
   damage: number;         // dégâts par balle / par plomb
   fireRate: number;       // ms entre deux tirs
   bulletSpeed: number;
@@ -21,6 +23,8 @@ export const WEAPONS: Record<string, WeaponDef> = {
   mas_1935a: {
     id: 'mas_1935a',
     name: 'MAS 1935A',
+    category: 'Pistolet',
+    speedMultiplier: 1,
     damage: 15,
     fireRate: 400,
     bulletSpeed: 500,
@@ -37,6 +41,8 @@ export const WEAPONS: Record<string, WeaponDef> = {
   double_canon: {
     id: 'double_canon',
     name: 'Double canon',
+    category: 'Fusil de chasse',
+    speedMultiplier: 0.95,
     damage: 10,            // ×8 plombs = 80 à bout portant
     fireRate: 600,
     bulletSpeed: 550,
@@ -53,6 +59,8 @@ export const WEAPONS: Record<string, WeaponDef> = {
   mas_40: {
     id: 'mas_40',
     name: 'MAS 40',
+    category: 'Fusil semi-auto',
+    speedMultiplier: 0.92,
     damage: 50,
     fireRate: 500,
     bulletSpeed: 700,
@@ -69,6 +77,8 @@ export const WEAPONS: Record<string, WeaponDef> = {
   mas_38: {
     id: 'mas_38',
     name: 'MAS 38',
+    category: 'Mitraillette',
+    speedMultiplier: 0.95,
     damage: 20,
     fireRate: 110,
     bulletSpeed: 550,
@@ -85,6 +95,8 @@ export const WEAPONS: Record<string, WeaponDef> = {
   fm_24_29: {
     id: 'fm_24_29',
     name: 'FM 24/29',
+    category: 'Fusil-mitrailleur',
+    speedMultiplier: 0.8,
     damage: 40,
     fireRate: 150,
     bulletSpeed: 650,

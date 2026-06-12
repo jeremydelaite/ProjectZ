@@ -136,6 +136,16 @@ src/
 - Caisses en bois visibles sur la map, prompt « E — Acheter », interaction
   unifiée avec les débris ; HUD : nom de l'arme + munitions
 
+**Raffinements (retours de test)** :
+- **Vitesse selon l'arme portée** : pistolet 100 %, double canon/MAS 38 95 %,
+  MAS 40 92 %, FM 24/29 80 % — sortir le pistolet pour fuir devient un réflexe
+- **Règles d'achat** : l'achat échange l'arme TENUE. Le MAS 1935A n'est pas
+  échangeable → si on le tient avec une principale déjà sur soi, l'achat est
+  bloqué avec un message explicite (« passe sur ton arme principale (A) »)
+- **Catégorie affichée partout** (armes peu connues du grand public) :
+  « MAS 38 — Mitraillette », « FM 24/29 — Fusil-mitrailleur »… dans les prompts
+  d'achat et le HUD
+
 ---
 
 ## État actuel — où on en est

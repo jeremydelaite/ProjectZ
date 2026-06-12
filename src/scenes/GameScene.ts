@@ -36,6 +36,7 @@ export class GameScene extends Phaser.Scene {
   private hudText!: Phaser.GameObjects.Text;
   private roundText!: Phaser.GameObjects.Text;
   private promptText!: Phaser.GameObjects.Text;
+  private promptOverrideUntil: number = 0; // message temporaire (ex. achat bloqué)
   private keyInteract!: Phaser.Input.Keyboard.Key;
 
   constructor() {
@@ -210,6 +211,9 @@ export class GameScene extends Phaser.Scene {
    * Affiche le prompt de l'interactable le plus proche à portée.
    */
   private handleInteractions(): void {
+    // Un message temporaire (ex. raison de blocage) garde la main sur le prompt
+    if (this.time.now < this.promptOverrideUntil) return;
+
     type Interactable = {
       x: number;
       y: number;
@@ -217,6 +221,7 @@ export class GameScene extends Phaser.Scene {
       label: string;
       price: number;
       canBuy: boolean;
+      blockedReason?: string; // affiché en rouge si on appuie sur E
       buy: () => void;
     };
 
@@ -254,16 +259,37 @@ export class GameScene extends Phaser.Scene {
     for (const ws of this.map.weaponSpots) {
       const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, ws.spot.x, ws.spot.y);
       const owned = this.player.ownsWeapon(ws.weapon.id);
+      const fullName = `${ws.weapon.name} — ${ws.weapon.category}`;
+
+      let label: string;
+      let canBuy = false;
+      let blockedReason: string | undefined;
+
+      if (owned) {
+        label = `${fullName} (déjà équipée)`;
+      } else if (!this.player.hasMainWeapon()) {
+        // Emplacement principal libre : achat direct
+        label = `E — Acheter : ${fullName} (${ws.weapon.price} pts)`;
+        canBuy = true;
+      } else if (this.player.isHoldingPistol()) {
+        // On tient le pistolet : il n'est pas échangeable
+        label = `${fullName} (${ws.weapon.price} pts)`;
+        blockedReason = `Le MAS 1935A n'est pas échangeable — passe sur ton arme principale (A)`;
+      } else {
+        // On tient l'arme principale : l'achat l'échange
+        label = `E — Échanger ${this.player.getMainWeaponName()} → ${fullName} (${ws.weapon.price} pts)`;
+        canBuy = true;
+      }
+
       consider(
         {
           x: ws.spot.x,
           y: ws.spot.y,
           promptY: ws.spot.y - 26,
-          label: owned
-            ? `${ws.weapon.name} — déjà équipée`
-            : `E — Acheter : ${ws.weapon.name} (${ws.weapon.price} pts)`,
+          label,
           price: ws.weapon.price,
-          canBuy: !owned,
+          canBuy,
+          blockedReason,
           buy: () => this.player.equipWeapon(ws.weapon),
         },
         dist
@@ -281,8 +307,15 @@ export class GameScene extends Phaser.Scene {
       .setPosition(target.x, target.promptY)
       .setVisible(true);
 
-    if (Phaser.Input.Keyboard.JustDown(this.keyInteract) && target.canBuy) {
-      if (this.points >= target.price) {
+    if (Phaser.Input.Keyboard.JustDown(this.keyInteract)) {
+      if (!target.canBuy) {
+        // Achat bloqué : afficher la raison en rouge
+        if (target.blockedReason) {
+          this.promptText.setText(target.blockedReason).setColor('#ff1744');
+          this.promptOverrideUntil = this.time.now + 1500;
+          this.time.delayedCall(1500, () => this.promptText.setColor('#ffdd00'));
+        }
+      } else if (this.points >= target.price) {
         this.points -= target.price;
         target.buy();
         this.promptText.setVisible(false);
@@ -386,7 +419,7 @@ export class GameScene extends Phaser.Scene {
     const ammo = this.player.isReloadingNow()
       ? 'RECHARGE…'
       : `${this.player.getAmmo()}/${this.player.getMagazineSize()}`;
-    const text = `Points : ${this.points}   Kills : ${this.kills}   ${this.player.getWeaponName()} : ${ammo}`;
+    const text = `Points : ${this.points}   Kills : ${this.kills}   ${this.player.getWeaponName()} (${this.player.getWeaponCategory()}) : ${ammo}`;
     if (this.hudText.text !== text) this.hudText.setText(text);
   }
 

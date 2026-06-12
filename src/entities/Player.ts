@@ -107,6 +107,21 @@ export class Player extends Phaser.GameObjects.Container {
     return this.weapons.some(w => w.def.id === id);
   }
 
+  /** A déjà une arme principale (en plus du pistolet). */
+  hasMainWeapon(): boolean {
+    return this.weapons.length > 1;
+  }
+
+  /** Tient actuellement le pistolet (emplacement 0, non échangeable). */
+  isHoldingPistol(): boolean {
+    return this.currentWeapon === 0;
+  }
+
+  /** Nom de l'arme principale actuelle (si elle existe). */
+  getMainWeaponName(): string | null {
+    return this.weapons.length > 1 ? this.weapons[1].def.name : null;
+  }
+
   private handleSwitch(): void {
     if (this.weapons.length < 2) return;
     if (!Phaser.Input.Keyboard.JustDown(this.keys.switch)) return;
@@ -164,7 +179,8 @@ export class Player extends Phaser.GameObjects.Container {
   }
 
   private handleMovement(): void {
-    const speed = this.stats.speed;
+    // L'arme portée pèse sur la mobilité (le FM 24/29 ralentit nettement)
+    const speed = this.stats.speed * this.weapon.def.speedMultiplier;
     this.body.setVelocity(0, 0);
 
     const left = this.keys.left.isDown;
@@ -292,5 +308,6 @@ export class Player extends Phaser.GameObjects.Container {
   getAmmo(): number { return this.weapon.currentAmmo; }
   getMagazineSize(): number { return this.weapon.def.magazineSize; }
   getWeaponName(): string { return this.weapon.def.name; }
+  getWeaponCategory(): string { return this.weapon.def.category; }
   isReloadingNow(): boolean { return this.isReloading; }
 }
