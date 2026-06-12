@@ -5,13 +5,21 @@ import {
   WALLS,
   VITRAUX,
   DEBRIS,
+  WEAPON_SPOTS,
   DebrisDef,
+  WeaponSpotDef,
 } from '../config/map.config';
+import { WEAPONS, WeaponDef } from '../config/weapons.config';
 
 export interface DebrisObject {
   rect: Phaser.GameObjects.Rectangle;
   def: DebrisDef;
   cleared: boolean;
+}
+
+export interface WeaponSpot {
+  spot: WeaponSpotDef;
+  weapon: WeaponDef;
 }
 
 /**
@@ -24,6 +32,7 @@ export class VillageMap {
   public obstacles: Phaser.GameObjects.Rectangle[] = [];
   public vitraux: Phaser.GameObjects.Rectangle[] = [];
   public debris: DebrisObject[] = [];
+  public weaponSpots: WeaponSpot[] = [];
 
   constructor(scene: Phaser.Scene) {
     // Sol (neige sale)
@@ -59,6 +68,15 @@ export class VillageMap {
       const rect = scene.add.rectangle(def.x, def.y, def.w, def.h, def.color).setDepth(2);
       scene.physics.add.existing(rect, true);
       this.debris.push({ rect, def, cleared: false });
+    }
+
+    // Caisses d'armes (décor, sans collision — l'interaction est gérée par la scène)
+    for (const spot of WEAPON_SPOTS) {
+      const weapon = WEAPONS[spot.weaponId];
+      // Caisse en bois avec couvercle
+      scene.add.rectangle(spot.x, spot.y, 30, 22, 0x7a5c3e).setDepth(1);
+      scene.add.rectangle(spot.x, spot.y - 4, 30, 4, 0x9b7653).setDepth(1);
+      this.weaponSpots.push({ spot, weapon });
     }
   }
 

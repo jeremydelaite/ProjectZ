@@ -1,6 +1,12 @@
 import Phaser from 'phaser';
 import { Bullet } from './Bullet';
-import { Stats, WeaponStats } from '../types';
+import { Stats } from '../types';
+import { WeaponDef, WEAPONS } from '../config/weapons.config';
+
+interface WeaponSlot {
+  def: WeaponDef;
+  currentAmmo: number;
+}
 
 export class Player extends Phaser.GameObjects.Container {
   declare body: Phaser.Physics.Arcade.Body;
@@ -11,29 +17,28 @@ export class Player extends Phaser.GameObjects.Container {
     speed: 200,
   };
 
-  private weapon: WeaponStats = {
-    damage: 15,
-    fireRate: 400,
-    bulletSpeed: 500,
-    magazineSize: 8,
-    currentAmmo: 8,
-    reloadTime: 1500,
-  };
+  // 2 armes max : [0] = arme de poing (toujours là), [1] = arme principale
+  private weapons: WeaponSlot[] = [
+    { def: WEAPONS.mas_1935a, currentAmmo: WEAPONS.mas_1935a.magazineSize },
+  ];
+  private currentWeapon: number = 0;
 
   private lastFired: number = 0;
   private isDead: boolean = false;
+  private pointerReleased: boolean = true; // pour le tir semi-auto
 
   // Rechargement (réserve illimitée, mais changer de chargeur prend du temps)
   private isReloading: boolean = false;
   private reloadStarted: number = 0;
 
-  // Touches ZQSD (AZERTY) + R pour recharger
+  // Touches ZQSD (AZERTY) + R recharger + A changer d'arme
   private keys!: {
     up: Phaser.Input.Keyboard.Key;
     down: Phaser.Input.Keyboard.Key;
     left: Phaser.Input.Keyboard.Key;
     right: Phaser.Input.Keyboard.Key;
     reload: Phaser.Input.Keyboard.Key;
+    switch: Phaser.Input.Keyboard.Key;
   };
 
   public bullets: Bullet[] = [];
@@ -67,17 +72,51 @@ export class Player extends Phaser.GameObjects.Container {
     this.body.setCollideWorldBounds(true);
     this.setDepth(10);
 
-    // Input ZQSD + R
+    // Input ZQSD + R + A
     this.keys = {
       up: scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.Z),
       down: scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.S),
       left: scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.Q),
       right: scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D),
       reload: scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.R),
+      switch: scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.A),
     };
 
     this.drawHpBar();
   }
+
+  // ---------------------------------------------------------------- armes
+
+  private get weapon(): WeaponSlot {
+    return this.weapons[this.currentWeapon];
+  }
+
+  /** Équipe une arme achetée. Remplace l'arme principale si on en a déjà une. */
+  equipWeapon(def: WeaponDef): void {
+    const slot: WeaponSlot = { def, currentAmmo: def.magazineSize };
+    if (this.weapons.length === 1) {
+      this.weapons.push(slot);
+    } else {
+      this.weapons[1] = slot;
+    }
+    this.currentWeapon = 1;
+    this.isReloading = false;
+  }
+
+  ownsWeapon(id: string): boolean {
+    return this.weapons.some(w => w.def.id === id);
+  }
+
+  private handleSwitch(): void {
+    if (this.weapons.length < 2) return;
+    if (!Phaser.Input.Keyboard.JustDown(this.keys.switch)) return;
+
+    this.currentWeapon = (this.currentWeapon + 1) % this.weapons.length;
+    this.isReloading = false; // changer d'arme annule le rechargement en cours
+    this.lastFired = 0;
+  }
+
+  // ---------------------------------------------------------------- visuel
 
   private drawHpBar(): void {
     this.hpBar.clear();
@@ -99,7 +138,7 @@ export class Player extends Phaser.GameObjects.Container {
 
     const w = 32;
     const progress = Phaser.Math.Clamp(
-      (time - this.reloadStarted) / this.weapon.reloadTime,
+      (time - this.reloadStarted) / this.weapon.def.reloadTime,
       0,
       1
     );
@@ -110,11 +149,14 @@ export class Player extends Phaser.GameObjects.Container {
     this.reloadBar.fillRect(-w / 2, -18, w * progress, 3);
   }
 
+  // ---------------------------------------------------------------- update
+
   update(time: number, delta: number, pointer: Phaser.Input.Pointer): void {
     if (this.isDead) return;
 
     this.handleMovement();
     this.handleRotation(pointer);
+    this.handleSwitch();
     this.handleReload(time);
     this.handleShooting(time, pointer);
     this.updateBullets(delta);
@@ -150,9 +192,9 @@ export class Player extends Phaser.GameObjects.Container {
   private handleReload(time: number): void {
     // Fin de rechargement
     if (this.isReloading) {
-      if (time - this.reloadStarted >= this.weapon.reloadTime) {
+      if (time - this.reloadStarted >= this.weapon.def.reloadTime) {
         this.isReloading = false;
-        this.weapon.currentAmmo = this.weapon.magazineSize;
+        this.weapon.currentAmmo = this.weapon.def.magazineSize;
       }
       return;
     }
@@ -160,7 +202,7 @@ export class Player extends Phaser.GameObjects.Container {
     // Rechargement manuel (R), seulement si le chargeur n'est pas plein
     if (
       Phaser.Input.Keyboard.JustDown(this.keys.reload) &&
-      this.weapon.currentAmmo < this.weapon.magazineSize
+      this.weapon.currentAmmo < this.weapon.def.magazineSize
     ) {
       this.startReload(time);
     }
@@ -172,23 +214,46 @@ export class Player extends Phaser.GameObjects.Container {
   }
 
   private handleShooting(time: number, pointer: Phaser.Input.Pointer): void {
+    if (!pointer.isDown) {
+      this.pointerReleased = true;
+      return;
+    }
     if (this.isReloading) return;
-    if (!pointer.isDown) return;
-    if (time - this.lastFired < this.weapon.fireRate) return;
+
+    const w = this.weapon;
+
+    // Semi-auto : un clic = un tir
+    if (!w.def.auto && !this.pointerReleased) return;
+    if (time - this.lastFired < w.def.fireRate) return;
 
     // Chargeur vide → rechargement auto
-    if (this.weapon.currentAmmo <= 0) {
+    if (w.currentAmmo <= 0) {
       this.startReload(time);
       return;
     }
 
     this.lastFired = time;
-    this.weapon.currentAmmo--;
+    this.pointerReleased = false;
+    w.currentAmmo--;
 
-    const angle = Phaser.Math.Angle.Between(this.x, this.y, pointer.worldX, pointer.worldY);
-    const bullet = new Bullet(this.scene, this.x, this.y, this.weapon.damage);
-    bullet.fire(angle, this.weapon.bulletSpeed);
-    this.bullets.push(bullet);
+    const baseAngle = Phaser.Math.Angle.Between(
+      this.x,
+      this.y,
+      pointer.worldX,
+      pointer.worldY
+    );
+
+    // Gerbe : N projectiles répartis dans le cône de dispersion
+    for (let i = 0; i < w.def.pellets; i++) {
+      let angle = baseAngle;
+      if (w.def.pellets > 1) {
+        const half = Phaser.Math.DegToRad(w.def.spreadDeg) / 2;
+        angle = baseAngle + Phaser.Math.FloatBetween(-half, half);
+      }
+      const bullet = new Bullet(this.scene, this.x, this.y, w.def.damage, w.def.bulletLifespan);
+      bullet.fire(angle, w.def.bulletSpeed);
+      this.bullets.push(bullet);
+    }
   }
 
   private updateBullets(delta: number): void {
@@ -225,6 +290,7 @@ export class Player extends Phaser.GameObjects.Container {
   getMaxHp(): number { return this.stats.maxHp; }
   isAlive(): boolean { return !this.isDead; }
   getAmmo(): number { return this.weapon.currentAmmo; }
-  getMagazineSize(): number { return this.weapon.magazineSize; }
+  getMagazineSize(): number { return this.weapon.def.magazineSize; }
+  getWeaponName(): string { return this.weapon.def.name; }
   isReloadingNow(): boolean { return this.isReloading; }
 }

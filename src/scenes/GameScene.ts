@@ -19,9 +19,9 @@ import { Zombie } from '../entities/Zombie';
 import { Bullet } from '../entities/Bullet';
 import { RoundManager } from '../systems/RoundManager';
 import { Pathfinder } from '../systems/Pathfinding';
-import { VillageMap, DebrisObject } from '../world/VillageMap';
+import { VillageMap } from '../world/VillageMap';
 
-const INTERACT_RANGE = 90; // distance pour interagir avec les débris
+const INTERACT_RANGE = 90; // distance pour interagir (débris, caisses d'armes)
 
 export class GameScene extends Phaser.Scene {
   private player!: Player;
@@ -121,7 +121,7 @@ export class GameScene extends Phaser.Scene {
     // Debug
     if (import.meta.env.DEV) {
       this.add
-        .text(16, 16, 'ProjectZ — DEV | Clic : tirer | ZQSD : bouger | R : recharger | E : déblayer', {
+        .text(16, 16, 'ProjectZ — DEV | Clic : tirer | ZQSD : bouger | R : recharger | E : acheter/déblayer | A : changer d\'arme', {
           font: '13px monospace',
           color: '#666666',
         })
@@ -202,49 +202,89 @@ export class GameScene extends Phaser.Scene {
       });
     }
 
-    this.handleDebrisInteraction();
+    this.handleInteractions();
   }
 
-  /** Affiche le prompt près d'un débris et gère le déblaiement (touche E). */
-  private handleDebrisInteraction(): void {
-    let nearest: DebrisObject | null = null;
+  /**
+   * Interaction unifiée à la touche E : débris à déblayer et caisses d'armes.
+   * Affiche le prompt de l'interactable le plus proche à portée.
+   */
+  private handleInteractions(): void {
+    type Interactable = {
+      x: number;
+      y: number;
+      promptY: number;
+      label: string;
+      price: number;
+      canBuy: boolean;
+      buy: () => void;
+    };
+
+    let nearest: Interactable | null = null;
     let nearestDist = INTERACT_RANGE;
+
+    const consider = (i: Interactable, dist: number) => {
+      if (dist < nearestDist) {
+        nearest = i;
+        nearestDist = dist;
+      }
+    };
 
     for (const d of this.map.debris) {
       if (d.cleared) continue;
-      const dist = Phaser.Math.Distance.Between(
-        this.player.x,
-        this.player.y,
-        d.def.x,
-        d.def.y
+      const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, d.def.x, d.def.y);
+      consider(
+        {
+          x: d.def.x,
+          y: d.def.y,
+          promptY: d.def.y - d.def.h / 2 - 12,
+          label: `E — Déblayer : ${d.def.label} (${d.def.price} pts)`,
+          price: d.def.price,
+          canBuy: true,
+          buy: () => {
+            this.map.clear(d);
+            // Le passage s'ouvre aussi pour le pathfinding des zombies
+            this.pathfinder.removeObstacleRect(d.def.x, d.def.y, d.def.w, d.def.h);
+          },
+        },
+        dist
       );
-      if (dist < nearestDist) {
-        nearest = d;
-        nearestDist = dist;
-      }
+    }
+
+    for (const ws of this.map.weaponSpots) {
+      const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, ws.spot.x, ws.spot.y);
+      const owned = this.player.ownsWeapon(ws.weapon.id);
+      consider(
+        {
+          x: ws.spot.x,
+          y: ws.spot.y,
+          promptY: ws.spot.y - 26,
+          label: owned
+            ? `${ws.weapon.name} — déjà équipée`
+            : `E — Acheter : ${ws.weapon.name} (${ws.weapon.price} pts)`,
+          price: ws.weapon.price,
+          canBuy: !owned,
+          buy: () => this.player.equipWeapon(ws.weapon),
+        },
+        dist
+      );
     }
 
     if (!nearest) {
       this.promptText.setVisible(false);
       return;
     }
+    const target: Interactable = nearest;
 
     this.promptText
-      .setText(`E — Déblayer : ${nearest.def.label} (${nearest.def.price} pts)`)
-      .setPosition(nearest.def.x, nearest.def.y - nearest.def.h / 2 - 12)
+      .setText(target.label)
+      .setPosition(target.x, target.promptY)
       .setVisible(true);
 
-    if (Phaser.Input.Keyboard.JustDown(this.keyInteract)) {
-      if (this.points >= nearest.def.price) {
-        this.points -= nearest.def.price;
-        this.map.clear(nearest);
-        // Le passage s'ouvre aussi pour le pathfinding des zombies
-        this.pathfinder.removeObstacleRect(
-          nearest.def.x,
-          nearest.def.y,
-          nearest.def.w,
-          nearest.def.h
-        );
+    if (Phaser.Input.Keyboard.JustDown(this.keyInteract) && target.canBuy) {
+      if (this.points >= target.price) {
+        this.points -= target.price;
+        target.buy();
         this.promptText.setVisible(false);
         this.updateHud();
       } else {
@@ -346,7 +386,7 @@ export class GameScene extends Phaser.Scene {
     const ammo = this.player.isReloadingNow()
       ? 'RECHARGE…'
       : `${this.player.getAmmo()}/${this.player.getMagazineSize()}`;
-    const text = `Points : ${this.points}   Kills : ${this.kills}   Pistolet : ${ammo}`;
+    const text = `Points : ${this.points}   Kills : ${this.kills}   ${this.player.getWeaponName()} : ${ammo}`;
     if (this.hudText.text !== text) this.hudText.setText(text);
   }
 

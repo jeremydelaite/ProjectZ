@@ -6,7 +6,7 @@ const PIERCE_MULTIPLIERS = [1, 0.75, 0.5];
 
 export class Bullet extends Phaser.GameObjects.Rectangle {
   declare body: Phaser.Physics.Arcade.Body;
-  private lifespan: number = 1200; // ms avant autodestruction
+  private lifespan: number; // ms avant autodestruction = portée
   private elapsed: number = 0;
   public damage: number;
 
@@ -14,9 +14,16 @@ export class Bullet extends Phaser.GameObjects.Rectangle {
   // pendant les frames où la balle le chevauche)
   private hitTargets = new Set<unknown>();
 
-  constructor(scene: Phaser.Scene, x: number, y: number, damage: number) {
+  constructor(
+    scene: Phaser.Scene,
+    x: number,
+    y: number,
+    damage: number,
+    lifespan: number = 1200
+  ) {
     super(scene, x, y, 6, 6, 0xffdd00);
     this.damage = damage;
+    this.lifespan = lifespan;
 
     scene.add.existing(this);
     scene.physics.add.existing(this);

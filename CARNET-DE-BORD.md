@@ -111,6 +111,31 @@ src/
   de +64 px, détecteur d'enlisement (bloqué ~600 ms → chemin jeté, recalcul,
   impulsion latérale pour se décoller).
 
+### Session 4 — Étape 5 : le système d'armes
+
+**Décisions de design actées avec Jerem** :
+- Pas de wall-buy à la COD ni de caisse mystère (jamais) → **emplacements
+  thématiques** : chaque arme a SA place dans le village, achat à la touche E
+- Passage en vue isométrique : reporté à la phase direction artistique (la
+  logique top-down actuelle reste valable, l'iso est une couche de rendu)
+
+**Système d'armes** (`src/config/weapons.config.ts`, refonte `Player.ts`) :
+- 2 armes max : MAS 1935A (toujours sur soi) + une arme principale — touche
+  **A** pour changer, achat = remplace l'arme principale
+- Semi-auto (un clic = un tir) vs full-auto (clic maintenu) selon l'arme
+- Portée par arme (durée de vie des balles), gerbe de plombs pour le fusil
+
+| Arme | Dégâts | Chargeur | Prix | Emplacement |
+|---|---|---|---|---|
+| MAS 1935A | 15 | 8 | départ | — |
+| Double canon | 8×10 (gerbe) | 2 | 750 | la ferme (maison SO) |
+| MAS 40 | 50 | 10 | 1 200 | église, près de l'autel |
+| MAS 38 | 20 (full auto) | 32 | 1 500 | maison barricadée est |
+| FM 24/29 | 40 (full auto) | 25 | 3 000 | carcasse de char |
+
+- Caisses en bois visibles sur la map, prompt « E — Acheter », interaction
+  unifiée avec les débris ; HUD : nom de l'arme + munitions
+
 ---
 
 ## État actuel — où on en est
@@ -126,14 +151,10 @@ Coureur, Pionnier et Gazé viendront plus tard.
 
 ## Prochaines étapes
 
-1. **Étape 5 — Les armes**
-   - Transformer l'arme codée en dur en vrai système d'armes : le pistolet devient
-     officiellement le **MAS 1935A** (stats déjà conformes : 15 dégâts, chargeur 8)
-   - Puis le **système d'achat** (specs issue #3) : double canon 750 pts,
-     MAS 40 1 200, MAS 38 1 500, FM 24/29 3 000 — 2 armes max sur soi
-2. Équilibrage en jeu (prix des débris, cadences, scaling) au fil des tests
-3. Plus tard : autres types de zombies, récompenses de manche (tous les 5 niveaux),
-   amélioration d'armes (atelier d'armurier), vrais assets graphiques
+1. Équilibrage en jeu (armes, prix, cadences, scaling) au fil des tests
+2. Plus tard : autres types de zombies, récompenses de manche (tous les 5 niveaux),
+   amélioration d'armes (atelier d'armurier), vue isométrique + vrais assets
+   graphiques (chantier DA)
 4. revoir les collisions des zombies.
 
 ## Points de réglage rapides
@@ -142,5 +163,6 @@ Coureur, Pionnier et Gazé viendront plus tard.
 |---|---|
 | Stats Fantassin, points, scaling, cadence spawn | `src/config/zombies.config.ts` |
 | Géométrie map, prix des débris, spawns | `src/config/map.config.ts` |
-| Stats du pistolet (dégâts, chargeur, recharge) | `src/entities/Player.ts` |
+| Stats et prix des 5 armes | `src/config/weapons.config.ts` |
+| Emplacements des caisses d'armes | `src/config/map.config.ts` |
 | Durée d'accalmie, plafond simultané | `src/config/zombies.config.ts` |

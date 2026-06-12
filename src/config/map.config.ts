@@ -117,6 +117,21 @@ export const DEBRIS: DebrisDef[] = [
   { x: 1730, y: 544, w: 28, h: 128, color: RUBBLE, price: 750, label: 'Mur effondré' },
 ];
 
+// Emplacements d'achat d'armes (caisses thématiques, touche E).
+// Chaque arme a SA place dans le village — pas de wall-buy.
+export interface WeaponSpotDef {
+  x: number;
+  y: number;
+  weaponId: string;
+}
+
+export const WEAPON_SPOTS: WeaponSpotDef[] = [
+  { x: 1100, y: 290, weaponId: 'mas_40' },       // église, près de l'autel (clocher)
+  { x: 600, y: 1050, weaponId: 'double_canon' }, // la ferme (maison sud-ouest)
+  { x: 1960, y: 450, weaponId: 'mas_38' },       // maison barricadée du quartier est
+  { x: 950, y: 1110, weaponId: 'fm_24_29' },     // sur la carcasse de char
+];
+
 // Points d'apparition des zombies : devant les vitraux + brèches du village
 export const SPAWN_POINTS = [
   { x: 1040, y: 130 },             // devant vitrail nord-ouest

@@ -1,0 +1,99 @@
+// Arsenal français WW2 — Issue #3
+// Achat sur des emplacements thématiques du village (pas de wall-buy COD).
+
+export interface WeaponDef {
+  id: string;
+  name: string;
+  damage: number;         // dégâts par balle / par plomb
+  fireRate: number;       // ms entre deux tirs
+  bulletSpeed: number;
+  bulletLifespan: number; // ms de vol = portée
+  magazineSize: number;
+  reloadTime: number;     // ms
+  auto: boolean;          // true = tir maintenu, false = un clic par tir
+  pellets: number;        // 1 = balle unique, >1 = gerbe (fusil de chasse)
+  spreadDeg: number;      // dispersion totale de la gerbe en degrés
+  price: number;          // points (0 = arme de départ)
+}
+
+export const WEAPONS: Record<string, WeaponDef> = {
+  // 🔫 Arme de départ — survie de secours, insuffisante vers la manche 4-5
+  mas_1935a: {
+    id: 'mas_1935a',
+    name: 'MAS 1935A',
+    damage: 15,
+    fireRate: 400,
+    bulletSpeed: 500,
+    bulletLifespan: 1200,
+    magazineSize: 8,
+    reloadTime: 1500,
+    auto: false,
+    pellets: 1,
+    spreadDeg: 0,
+    price: 0,
+  },
+
+  // 🌾 Dégager un couloir, sauver sa peau — risque/récompense au corps à corps
+  double_canon: {
+    id: 'double_canon',
+    name: 'Double canon',
+    damage: 10,            // ×8 plombs = 80 à bout portant
+    fireRate: 600,
+    bulletSpeed: 550,
+    bulletLifespan: 320,   // portée très courte
+    magazineSize: 2,
+    reloadTime: 2200,
+    auto: false,
+    pellets: 8,
+    spreadDeg: 24,
+    price: 750,
+  },
+
+  // 🎯 Précision et économie — one-shot les Fantassins pendant longtemps
+  mas_40: {
+    id: 'mas_40',
+    name: 'MAS 40',
+    damage: 50,
+    fireRate: 500,
+    bulletSpeed: 700,
+    bulletLifespan: 1600,  // portée longue
+    magazineSize: 10,
+    reloadTime: 1700,
+    auto: false,
+    pellets: 1,
+    spreadDeg: 0,
+    price: 1200,
+  },
+
+  // 💨 Gestion de horde rapprochée, arrosage en reculant
+  mas_38: {
+    id: 'mas_38',
+    name: 'MAS 38',
+    damage: 20,
+    fireRate: 110,
+    bulletSpeed: 550,
+    bulletLifespan: 900,   // portée moyenne
+    magazineSize: 32,
+    reloadTime: 1900,
+    auto: true,
+    pellets: 1,
+    spreadDeg: 0,
+    price: 1500,
+  },
+
+  // 🔥 L'arme de fin de run — puissante partout, chère, rechargement lent
+  fm_24_29: {
+    id: 'fm_24_29',
+    name: 'FM 24/29',
+    damage: 40,
+    fireRate: 150,
+    bulletSpeed: 650,
+    bulletLifespan: 1600,  // portée longue
+    magazineSize: 25,
+    reloadTime: 2600,
+    auto: true,
+    pellets: 1,
+    spreadDeg: 0,
+    price: 3000,
+  },
+};
