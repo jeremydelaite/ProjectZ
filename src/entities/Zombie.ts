@@ -4,6 +4,10 @@ import { FANTASSIN_STATS } from '../config/zombies.config';
 import { Player } from './Player';
 import { Pathfinder } from '../systems/Pathfinding';
 
+// Demi-largeur utilisée pour la ligne de vue : le zombie ne prend un raccourci
+// que si son corps entier passe sans accrocher un coin de mur.
+const LOS_RADIUS = 14;
+
 export class Zombie extends Phaser.GameObjects.Container {
   declare body: Phaser.Physics.Arcade.Body;
 
@@ -51,7 +55,7 @@ export class Zombie extends Phaser.GameObjects.Container {
     scene.add.existing(this);
     scene.physics.add.existing(this);
 
-    this.body.setSize(26, 26);
+    this.body.setSize(24, 24);
     this.setDepth(5);
 
     this.drawHpBar();
@@ -83,14 +87,17 @@ export class Zombie extends Phaser.GameObjects.Container {
     let targetX = player.x;
     let targetY = player.y;
 
-    if (this.pathfinder && !this.pathfinder.hasLineOfSight(this.x, this.y, player.x, player.y)) {
+    if (
+      this.pathfinder &&
+      !this.pathfinder.hasLineOfSight(this.x, this.y, player.x, player.y, LOS_RADIUS)
+    ) {
       if (time >= this.nextRepath) {
         // Repath étalé dans le temps pour lisser la charge CPU
         this.nextRepath = time + 400 + Math.random() * 400;
         this.path = this.pathfinder.findPath(this.x, this.y, player.x, player.y) ?? [];
       }
 
-      // Avancer dans le chemin : points atteints, et raccourcis à vue
+      // Avancer dans le chemin : points atteints, et raccourcis à vue (épaisse)
       while (
         this.path.length > 0 &&
         Phaser.Math.Distance.Between(this.x, this.y, this.path[0].x, this.path[0].y) < 12
@@ -99,7 +106,7 @@ export class Zombie extends Phaser.GameObjects.Container {
       }
       if (
         this.path.length > 1 &&
-        this.pathfinder.hasLineOfSight(this.x, this.y, this.path[1].x, this.path[1].y)
+        this.pathfinder.hasLineOfSight(this.x, this.y, this.path[1].x, this.path[1].y, LOS_RADIUS)
       ) {
         this.path.shift();
       }
@@ -119,7 +126,11 @@ export class Zombie extends Phaser.GameObjects.Container {
     );
 
     // Filet de sécurité : si malgré tout bloqué contre un mur, glisser le long
+    // et recalculer un chemin immédiatement (au lieu d'attendre le prochain repath)
     const blocked = this.body.blocked;
+    if (blocked.left || blocked.right || blocked.up || blocked.down) {
+      this.nextRepath = Math.min(this.nextRepath, time + 50 + Math.random() * 100);
+    }
     if (blocked.left || blocked.right) {
       const dirY = Math.sign(targetY - this.y) || 1;
       this.body.setVelocity(0, dirY * this.stats.speed);

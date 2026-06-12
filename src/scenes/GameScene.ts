@@ -138,12 +138,13 @@ export class GameScene extends Phaser.Scene {
     this.updateHud();
 
     this.roundManager.update(time, delta);
+    this.updateRoundHud();
 
     // Purge des zombies détruits + update
     this.zombies = this.zombies.filter(z => z.active);
     this.zombies.forEach(z => z.update(time, delta, this.player));
 
-    // Balles → zombies
+    // Balles → zombies (perforation : jusqu'à 3 cibles, dégâts dégressifs)
     this.physics.overlap(
       this.player.bullets,
       this.zombies,
@@ -151,8 +152,8 @@ export class GameScene extends Phaser.Scene {
         const b = bullet as Bullet;
         const z = zombie as Zombie;
         if (!z.isAlive()) return;
-        z.takeDamage(b.damage);
-        b.destroy();
+        const dmg = b.registerHit(z);
+        if (dmg !== null) z.takeDamage(dmg);
       }
     );
 
@@ -250,7 +251,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onRoundStarted(round: number): void {
-    this.roundText.setText(`Manche ${round}`);
+    this.updateRoundHud();
 
     // Annonce centrale qui s'estompe
     const announce = this.add
@@ -301,6 +302,14 @@ export class GameScene extends Phaser.Scene {
     this.points += POINTS_PER_KILL;
     this.kills++;
     this.updateHud();
+  }
+
+  private updateRoundHud(): void {
+    const round = this.roundManager.getRound();
+    const text = this.roundManager.isIntermission()
+      ? `Manche ${round} — accalmie`
+      : `Manche ${round} — ${this.roundManager.getRemainingInRound()} restants`;
+    if (this.roundText.text !== text) this.roundText.setText(text);
   }
 
   private updateHud(): void {

@@ -37,6 +37,12 @@ export class RoundManager {
     return this.inIntermission;
   }
 
+  /** Zombies restants dans la manche (à spawner + encore vivants). */
+  getRemainingInRound(): number {
+    if (this.inIntermission) return 0;
+    return this.remainingToSpawn + this.getAliveCount();
+  }
+
   update(_time: number, delta: number): void {
     if (this.round === 0) return;
 

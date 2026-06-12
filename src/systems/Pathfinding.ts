@@ -59,7 +59,7 @@ export class Pathfinder {
   }
 
   /** Vrai si le segment ne traverse aucune cellule bloquée (échantillonnage serré). */
-  hasLineOfSight(x1: number, y1: number, x2: number, y2: number): boolean {
+  private lineIsClear(x1: number, y1: number, x2: number, y2: number): boolean {
     const dist = Phaser.Math.Distance.Between(x1, y1, x2, y2);
     const steps = Math.max(1, Math.ceil(dist / (this.cell / 2)));
     for (let i = 0; i <= steps; i++) {
@@ -67,6 +67,29 @@ export class Pathfinder {
       if (this.isBlockedAt(x1 + (x2 - x1) * t, y1 + (y2 - y1) * t)) return false;
     }
     return true;
+  }
+
+  /**
+   * Ligne de vue. Avec radius > 0, vérifie aussi deux rayons parallèles décalés
+   * de ±radius : un corps de cette demi-largeur peut passer sans accrocher les coins.
+   */
+  hasLineOfSight(x1: number, y1: number, x2: number, y2: number, radius: number = 0): boolean {
+    if (!this.lineIsClear(x1, y1, x2, y2)) return false;
+    if (radius <= 0) return true;
+
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const len = Math.hypot(dx, dy);
+    if (len < 1) return true;
+
+    // Perpendiculaire unitaire
+    const px = (-dy / len) * radius;
+    const py = (dx / len) * radius;
+
+    return (
+      this.lineIsClear(x1 + px, y1 + py, x2 + px, y2 + py) &&
+      this.lineIsClear(x1 - px, y1 - py, x2 - px, y2 - py)
+    );
   }
 
   /**
