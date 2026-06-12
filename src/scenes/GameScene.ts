@@ -39,17 +39,28 @@ export class GameScene extends Phaser.Scene {
   private promptText!: Phaser.GameObjects.Text;
   private promptOverrideUntil: number = 0; // message temporaire (ex. achat bloqué)
   private keyInteract!: Phaser.Input.Keyboard.Key;
+  private keyPause!: Phaser.Input.Keyboard.Key;
+  private paused: boolean = false;
+  private pauseText!: Phaser.GameObjects.Text;
 
   constructor() {
     super({ key: 'GameScene' });
   }
 
   create(): void {
-    // Reset (au cas où la scène est relancée)
+    // Reset (la scène peut être relancée par « rejouer »)
     this.zombies = [];
     this.gameOver = false;
+    this.paused = false;
     this.points = 0;
     this.kills = 0;
+    this.promptOverrideUntil = 0;
+    // Les listeners survivent au restart : on repart de zéro
+    this.events.off('playerDead', this.onPlayerDead, this);
+    this.events.off('zombieHit', this.onZombieHit, this);
+    this.events.off('zombieKilled', this.onZombieKilled, this);
+    this.events.off('roundStarted', this.onRoundStarted, this);
+    this.events.off('roundEnded', this.onRoundEnded, this);
 
     // Map du village + grille de pathfinding
     this.physics.world.setBounds(0, 0, MAP_WIDTH, MAP_HEIGHT);
@@ -74,6 +85,18 @@ export class GameScene extends Phaser.Scene {
 
     // Interaction (déblayer les débris)
     this.keyInteract = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E);
+    this.keyPause = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+
+    this.pauseText = this.add
+      .text(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'PAUSE\n\nÉchap pour reprendre', {
+        font: 'bold 48px monospace',
+        color: '#ffdd00',
+        align: 'center',
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(200)
+      .setVisible(false);
     this.promptText = this.add
       .text(0, 0, '', {
         font: 'bold 14px monospace',
@@ -134,6 +157,12 @@ export class GameScene extends Phaser.Scene {
 
   update(time: number, delta: number): void {
     if (this.gameOver) return;
+
+    // Pause (Échap)
+    if (Phaser.Input.Keyboard.JustDown(this.keyPause)) {
+      this.togglePause();
+    }
+    if (this.paused) return;
 
     const pointer = this.input.activePointer;
     this.player.update(time, delta, pointer);
@@ -435,6 +464,16 @@ export class GameScene extends Phaser.Scene {
     if (this.hudText.text !== text) this.hudText.setText(text);
   }
 
+  private togglePause(): void {
+    this.paused = !this.paused;
+    if (this.paused) {
+      this.physics.pause();
+    } else {
+      this.physics.resume();
+    }
+    this.pauseText.setVisible(this.paused);
+  }
+
   private onPlayerDead(): void {
     this.gameOver = true;
     this.zombies.forEach(z => z.body && z.body.setVelocity(0, 0));
@@ -443,7 +482,7 @@ export class GameScene extends Phaser.Scene {
     this.add
       .text(
         GAME_WIDTH / 2,
-        GAME_HEIGHT / 2,
+        GAME_HEIGHT / 2 - 30,
         `GAME OVER\n\nManche ${this.roundManager.getRound()} — ${this.kills} kills — ${this.points} points`,
         {
           font: 'bold 40px monospace',
@@ -454,5 +493,27 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setScrollFactor(0)
       .setDepth(200);
+
+    // Rejouer (petit délai pour ne pas cliquer par accident en tirant)
+    this.time.delayedCall(800, () => {
+      const replay = this.add
+        .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 90, '— CLIQUE POUR REJOUER —', {
+          font: 'bold 22px monospace',
+          color: '#ffdd00',
+        })
+        .setOrigin(0.5)
+        .setScrollFactor(0)
+        .setDepth(200);
+
+      this.tweens.add({
+        targets: replay,
+        alpha: 0.25,
+        duration: 700,
+        yoyo: true,
+        repeat: -1,
+      });
+
+      this.input.once('pointerdown', () => this.scene.restart());
+    });
   }
 }

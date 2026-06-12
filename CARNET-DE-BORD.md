@@ -154,6 +154,13 @@ src/
 - La caisse d'une arme possédée vend la **recharge complète : 500 pts** ;
   « munitions pleines » si rien à racheter — HUD : `8/8 | ∞` ou `12/32 | 96`
 
+### Session 5 — Boucle de jeu complète
+
+**Écran titre, rejouer, pause** :
+- `MenuScene` : titre, rappel des contrôles, « clique pour commencer »
+- Game over → « clique pour rejouer » (restart propre de la scène, listeners purgés)
+- **Échap** : pause/reprise (physique gelée, overlay PAUSE)
+
 ---
 
 ## État actuel — où on en est
