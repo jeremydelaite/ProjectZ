@@ -238,24 +238,32 @@ les débris et les armes), pas au contact — on choisit quand consommer.
 ✅ Manches avec scaling (zombies + PV) et cadence progressive
 ✅ Map village + grande église de départ, vitraux, 2 sorties à déblayer (750 pts)
 ✅ Points, kills, HUD, game over avec score
+✅ Menu/pause/rejouer/bestiaire + records persistants, régén COD, caisses de
+   munitions des manches spéciales (E pour ramasser, 5 max, permanentes)
 
 **Décision en cours** : on garde UNIQUEMENT le Fantassin pour l'instant.
 Coureur, Pionnier et Gazé viendront plus tard.
 
-## Prochaines étapes
+## Cap : une première map complète (décision du 12/06)
 
-1. **Session d'équilibrage** : courbes PV/spawn, prix (débris 750, chargeurs 500),
-   dégâts des 5 armes, ratios SS/Coureur, poison — maintenant que toute la
-   difficulté est en place, jouer plusieurs runs et noter ce qui frustre
-2. **Atelier d'armurier** (Pack-a-Punch du GDD) : zone chère à débloquer,
-   amélioration d'arme ~5 000 pts (dégâts ×2,5, chargeur agrandi)
-3. **Récompenses de manche** restantes : power-ups temporaires éventuels
-   (points doublés, kill instantané) — la caisse de munitions des Gazés existe déjà
-4. **Le Pionnier** (tank, manche 8) si le jeu a besoin d'un casse-rythme
-5. **Chantier DA** : passage en vue isométrique + vrais assets (sprites,
-   tri de profondeur), sons d'armes — la logique actuelle reste valable
-6. Idées en réserve : récompense garantie toutes les 5 manches (soin/power-up),
-   high-score en ligne, grenades F1
+La boucle de gameplay est jugée bonne. Priorité : **finir UNE map de référence
+rapidement** — agrandir/densifier le village actuel plutôt que créer une
+nouvelle map. Le moule étant `map.config.ts`, les maps suivantes seront de
+simples fichiers de config.
+
+1. **Agrandissement du village** : chaîne de zones à débloquer style COD —
+   église (départ) → place du marché (750) → quartiers est/ouest (1 000-1 250)
+   → zone finale chère. Chaque zone : son arme, ses spawns, son intérêt tactique
+2. **Atelier d'armurier** en zone finale (Pack-a-Punch du GDD) : amélioration
+   d'arme ~5 000 pts (dégâts ×2,5, chargeur agrandi) — la raison d'ouvrir la map
+3. **Le mastodonte / Pionnier** (tank, manche 8) : 4× PV, armure, très lent,
+   gros knockback — à introduire quand la map aura des couloirs à bloquer
+4. **Session d'équilibrage** : courbes PV/spawn, prix, dégâts des 5 armes,
+   ratios SS/Coureur, poison — jouer des runs complets et noter ce qui frustre
+5. **Chantier DA** ensuite : vue isométrique + vrais assets + sons d'armes
+   (la logique top-down actuelle reste valable)
+6. Idées en réserve : power-ups (points doublés, kill instantané), récompense
+   garantie toutes les 5 manches, high-score en ligne, grenades F1
 4. revoir les collisions des zombies.
 
 ## Points de réglage rapides
