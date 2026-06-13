@@ -100,7 +100,7 @@ export const MAX_ZOMBIES_ON_SCREEN = 24;  // plafond simultané (perfs + lisibil
 
 // Part des spawns en « sortie de terre dynamique » juste hors du champ
 // de la caméra (le reste : points fixes les plus proches du joueur)
-export const DYNAMIC_SPAWN_CHANCE = 0.5;
+export const DYNAMIC_SPAWN_CHANCE = 0.85;
 
 /**
  * Intervalle entre deux spawns selon la manche : départ tranquille,

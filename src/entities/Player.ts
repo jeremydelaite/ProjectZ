@@ -1,12 +1,20 @@
 import Phaser from 'phaser';
 import { Bullet } from './Bullet';
 import { Stats } from '../types';
-import { WeaponDef, WEAPONS } from '../config/weapons.config';
+import {
+  WeaponDef,
+  WEAPONS,
+  AMMO_REFILL_PRICE,
+  UPGRADED_AMMO_REFILL_PRICE,
+  UPGRADE_DAMAGE_MULT,
+  UPGRADE_MAG_MULT,
+} from '../config/weapons.config';
 
 interface WeaponSlot {
   def: WeaponDef;
   currentAmmo: number;
   reserveAmmo: number; // balles en réserve (-1 = illimité, ex. pistolet)
+  upgraded: boolean;   // améliorée à la forge (×2 dégâts, ×2 chargeur)
 }
 
 export class Player extends Phaser.GameObjects.Container {
@@ -24,7 +32,6 @@ export class Player extends Phaser.GameObjects.Container {
   private lastDamageTime: number = -Infinity;
 
   // Verrou de début de partie : ni tir ni déplacement pendant N ms
-  // (évite de tirer en spammant le clic sur « rejouer »)
   private static readonly SPAWN_LOCK = 800; // ms
   private controlsLockedUntil: number = 0;
 
@@ -34,6 +41,7 @@ export class Player extends Phaser.GameObjects.Container {
       def: WEAPONS.mas_1935a,
       currentAmmo: WEAPONS.mas_1935a.magazineSize,
       reserveAmmo: -1,
+      upgraded: false,
     },
   ];
   private currentWeapon: number = 0;
@@ -41,7 +49,6 @@ export class Player extends Phaser.GameObjects.Container {
   private lastFired: number = 0;
   private isDead: boolean = false;
   // false au départ : la toute première balle exige un clic frais
-  // (le clic qui a lancé la partie ne compte pas)
   private pointerReleased: boolean = false;
 
   // Rechargement (réserve illimitée, mais changer de chargeur prend du temps)
@@ -69,13 +76,9 @@ export class Player extends Phaser.GameObjects.Container {
   constructor(scene: Phaser.Scene, x: number, y: number) {
     super(scene, x, y);
 
-    // Corps du joueur (carré vert foncé)
     this.body_rect = scene.add.rectangle(0, 0, 28, 28, 0x2e7d32);
-    // Canon (rectangle qui pointe vers la droite par défaut)
     this.barrel = scene.add.rectangle(18, 0, 16, 6, 0x1b5e20);
-    // Barre de vie (au dessus)
     this.hpBar = scene.add.graphics();
-    // Barre de rechargement (sous la barre de vie)
     this.reloadBar = scene.add.graphics();
 
     this.add([this.body_rect, this.barrel, this.hpBar, this.reloadBar]);
@@ -83,13 +86,11 @@ export class Player extends Phaser.GameObjects.Container {
     scene.add.existing(this);
     scene.physics.add.existing(this);
 
-    // Sur un Container, le corps est ancré sur l'origine : il faut le recentrer
     this.body.setSize(28, 28);
     this.body.setOffset(-14, -14);
     this.body.setCollideWorldBounds(true);
     this.setDepth(10);
 
-    // Input ZQSD + R + A
     this.keys = {
       up: scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.Z),
       down: scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.S),
@@ -120,6 +121,7 @@ export class Player extends Phaser.GameObjects.Container {
       def,
       currentAmmo: def.magazineSize,
       reserveAmmo: this.fullReserve(def),
+      upgraded: false,
     };
     if (this.weapons.length === 1) {
       this.weapons.push(slot);
@@ -175,6 +177,41 @@ export class Player extends Phaser.GameObjects.Container {
     slot.reserveAmmo = this.fullReserve(slot.def);
   }
 
+  /** Prix du rachat de réserve pour cette arme (×10 si améliorée). */
+  getAmmoRefillPrice(weaponId: string): number {
+    const slot = this.weapons.find(w => w.def.id === weaponId);
+    return slot?.upgraded ? UPGRADED_AMMO_REFILL_PRICE : AMMO_REFILL_PRICE;
+  }
+
+  /** L'arme TENUE est-elle déjà améliorée ? */
+  isHeldWeaponUpgraded(): boolean {
+    return this.weapon.upgraded;
+  }
+
+  /**
+   * Forge : améliore l'arme TENUE (×2 dégâts, ×2 chargeur), une seule fois.
+   * Le def est cloné pour ne pas modifier l'arme de base partagée. Le pistolet
+   * est améliorable et conserve sa réserve illimitée. Renvoie false si déjà fait.
+   */
+  upgradeHeldWeapon(): boolean {
+    const slot = this.weapon;
+    if (slot.upgraded) return false;
+
+    const base = slot.def;
+    const upgradedDef: WeaponDef = {
+      ...base,
+      name: `${base.name} ✦`,
+      damage: Math.round(base.damage * UPGRADE_DAMAGE_MULT),
+      magazineSize: Math.round(base.magazineSize * UPGRADE_MAG_MULT),
+    };
+    slot.def = upgradedDef;
+    slot.upgraded = true;
+    slot.currentAmmo = upgradedDef.magazineSize;
+    slot.reserveAmmo = this.fullReserve(upgradedDef);
+    this.isReloading = false;
+    return true;
+  }
+
   private handleSwitch(): void {
     if (this.weapons.length < 2) return;
     if (!Phaser.Input.Keyboard.JustDown(this.keys.switch)) return;
@@ -191,11 +228,9 @@ export class Player extends Phaser.GameObjects.Container {
     const w = 32;
     const ratio = this.stats.hp / this.stats.maxHp;
 
-    // Fond rouge
     this.hpBar.fillStyle(0x880000);
     this.hpBar.fillRect(-w / 2, -24, w, 4);
 
-    // Barre verte
     this.hpBar.fillStyle(0x00e676);
     this.hpBar.fillRect(-w / 2, -24, w * ratio, 4);
   }
@@ -222,20 +257,15 @@ export class Player extends Phaser.GameObjects.Container {
   update(time: number, delta: number, pointer: Phaser.Input.Pointer): void {
     if (this.isDead) return;
 
-    // Recalcule les coordonnées MONDE du pointeur depuis la caméra courante.
-    // Sans ça, worldX/worldY ne sont rafraîchis qu'au mouvement de la souris :
-    // quand la caméra bouge (lancement, scrolling), la visée reste périmée
-    // (bug du perso bloqué « regard à gauche » après un refresh).
     pointer.updateWorldPoint(this.scene.cameras.main);
 
     this.handleRotation(pointer);
     this.updateBullets(delta);
     this.drawReloadBar(time);
 
-    // Verrou de début de partie : viser ok, mais ni tir ni déplacement
     if (time < this.controlsLockedUntil) {
       this.body.setVelocity(0, 0);
-      if (pointer.isDown) this.pointerReleased = false; // oblige à relâcher le clic
+      if (pointer.isDown) this.pointerReleased = false;
       return;
     }
 
@@ -247,7 +277,6 @@ export class Player extends Phaser.GameObjects.Container {
   }
 
   private handleMovement(): void {
-    // L'arme portée pèse sur la mobilité (le FM 24/29 ralentit nettement)
     const speed = this.stats.speed * this.weapon.def.speedMultiplier;
     this.body.setVelocity(0, 0);
 
@@ -262,7 +291,6 @@ export class Player extends Phaser.GameObjects.Container {
     if (up) this.body.setVelocityY(-speed);
     else if (down) this.body.setVelocityY(speed);
 
-    // Normaliser la diagonale
     if ((left || right) && (up || down)) {
       this.body.velocity.normalize().scale(speed);
     }
@@ -286,14 +314,12 @@ export class Player extends Phaser.GameObjects.Container {
   }
 
   private handleReload(time: number): void {
-    // Fin de rechargement : prélever sur la réserve
     if (this.isReloading) {
       if (time - this.reloadStarted >= this.weapon.def.reloadTime) {
         this.isReloading = false;
         const w = this.weapon;
         const needed = w.def.magazineSize - w.currentAmmo;
         if (w.reserveAmmo < 0) {
-          // Réserve illimitée (pistolet)
           w.currentAmmo = w.def.magazineSize;
         } else {
           const taken = Math.min(needed, w.reserveAmmo);
@@ -304,7 +330,6 @@ export class Player extends Phaser.GameObjects.Container {
       return;
     }
 
-    // Rechargement manuel (R)
     if (Phaser.Input.Keyboard.JustDown(this.keys.reload)) {
       this.startReload(time);
     }
@@ -330,11 +355,9 @@ export class Player extends Phaser.GameObjects.Container {
 
     const w = this.weapon;
 
-    // Semi-auto : un clic = un tir
     if (!w.def.auto && !this.pointerReleased) return;
     if (time - this.lastFired < w.def.fireRate) return;
 
-    // Chargeur vide → rechargement auto
     if (w.currentAmmo <= 0) {
       this.startReload(time);
       return;
@@ -344,7 +367,6 @@ export class Player extends Phaser.GameObjects.Container {
     this.pointerReleased = false;
     w.currentAmmo--;
 
-    // Recharge automatique dès que le chargeur est vide
     if (w.currentAmmo === 0) {
       this.startReload(time);
     }
@@ -356,7 +378,6 @@ export class Player extends Phaser.GameObjects.Container {
       pointer.worldY
     );
 
-    // Gerbe : N projectiles répartis dans le cône de dispersion
     for (let i = 0; i < w.def.pellets; i++) {
       let angle = baseAngle;
       if (w.def.pellets > 1) {
@@ -384,7 +405,6 @@ export class Player extends Phaser.GameObjects.Container {
     this.stats.hp = Math.max(0, this.stats.hp - amount);
     this.drawHpBar();
 
-    // Flash rouge
     this.scene.tweens.add({
       targets: this.body_rect,
       fillColor: 0xff1744,

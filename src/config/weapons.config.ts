@@ -22,99 +22,42 @@ export interface WeaponDef {
 // Racheter une réserve complète de chargeurs à la caisse de l'arme
 export const AMMO_REFILL_PRICE = 500;
 
+// --- Forge (enclume du cimetière) : amélioration d'arme ---
+export const UPGRADE_PRICE = 5000;           // coût de l'amélioration
+export const UPGRADE_DAMAGE_MULT = 2;        // ×2 dégâts
+export const UPGRADE_MAG_MULT = 2;           // ×2 taille du chargeur
+// Une arme améliorée coûte beaucoup plus cher à réapprovisionner (style Pack-a-Punch)
+export const UPGRADED_AMMO_REFILL_PRICE = 5000;
+
 export const WEAPONS: Record<string, WeaponDef> = {
-  // 🔫 Arme de départ — survie de secours, insuffisante vers la manche 4-5
   mas_1935a: {
-    id: 'mas_1935a',
-    name: 'MAS 1935A',
-    category: 'Pistolet',
-    speedMultiplier: 1,
-    damage: 15,
-    fireRate: 400,
-    bulletSpeed: 500,
-    bulletLifespan: 1200,
-    magazineSize: 8,
-    reloadTime: 1500,
-    auto: false,
-    pellets: 1,
-    spreadDeg: 0,
-    price: 0,
-    reserveMagazines: -1, // arme de secours : réserve illimitée
+    id: 'mas_1935a', name: 'MAS 1935A', category: 'Pistolet',
+    speedMultiplier: 1, damage: 15, fireRate: 400, bulletSpeed: 500, bulletLifespan: 1200,
+    magazineSize: 8, reloadTime: 1500, auto: false, pellets: 1, spreadDeg: 0, price: 0,
+    reserveMagazines: -1,
   },
-
-  // 🌾 Dégager un couloir, sauver sa peau — risque/récompense au corps à corps
   double_canon: {
-    id: 'double_canon',
-    name: 'Double canon',
-    category: 'Fusil de chasse',
-    speedMultiplier: 0.95,
-    damage: 10,            // ×8 plombs = 80 à bout portant
-    fireRate: 600,
-    bulletSpeed: 550,
-    bulletLifespan: 320,   // portée très courte
-    magazineSize: 2,
-    reloadTime: 2200,
-    auto: false,
-    pellets: 8,
-    spreadDeg: 24,
-    price: 750,
-    reserveMagazines: 10, // 20 cartouches
+    id: 'double_canon', name: 'Double canon', category: 'Fusil de chasse',
+    speedMultiplier: 0.95, damage: 10, fireRate: 600, bulletSpeed: 550, bulletLifespan: 320,
+    magazineSize: 2, reloadTime: 2200, auto: false, pellets: 8, spreadDeg: 24, price: 750,
+    reserveMagazines: 10,
   },
-
-  // 🎯 Précision et économie — one-shot les Fantassins pendant longtemps
   mas_40: {
-    id: 'mas_40',
-    name: 'MAS 40',
-    category: 'Fusil semi-auto',
-    speedMultiplier: 0.92,
-    damage: 50,
-    fireRate: 500,
-    bulletSpeed: 700,
-    bulletLifespan: 1600,  // portée longue
-    magazineSize: 10,
-    reloadTime: 1700,
-    auto: false,
-    pellets: 1,
-    spreadDeg: 0,
-    price: 1200,
-    reserveMagazines: 6, // 60 balles
+    id: 'mas_40', name: 'MAS 40', category: 'Fusil semi-auto',
+    speedMultiplier: 0.92, damage: 50, fireRate: 500, bulletSpeed: 700, bulletLifespan: 1600,
+    magazineSize: 10, reloadTime: 1700, auto: false, pellets: 1, spreadDeg: 0, price: 1200,
+    reserveMagazines: 6,
   },
-
-  // 💨 Gestion de horde rapprochée, arrosage en reculant
   mas_38: {
-    id: 'mas_38',
-    name: 'MAS 38',
-    category: 'Mitraillette',
-    speedMultiplier: 0.95,
-    damage: 20,
-    fireRate: 110,
-    bulletSpeed: 550,
-    bulletLifespan: 900,   // portée moyenne
-    magazineSize: 32,
-    reloadTime: 1900,
-    auto: true,
-    pellets: 1,
-    spreadDeg: 0,
-    price: 1500,
-    reserveMagazines: 4, // 128 balles
+    id: 'mas_38', name: 'MAS 38', category: 'Mitraillette',
+    speedMultiplier: 0.95, damage: 20, fireRate: 110, bulletSpeed: 550, bulletLifespan: 900,
+    magazineSize: 32, reloadTime: 1900, auto: true, pellets: 1, spreadDeg: 0, price: 1500,
+    reserveMagazines: 4,
   },
-
-  // 🔥 L'arme de fin de run — puissante partout, chère, rechargement lent
   fm_24_29: {
-    id: 'fm_24_29',
-    name: 'FM 24/29',
-    category: 'Fusil-mitrailleur',
-    speedMultiplier: 0.8,
-    damage: 40,
-    fireRate: 150,
-    bulletSpeed: 650,
-    bulletLifespan: 1600,  // portée longue
-    magazineSize: 50,
-    reloadTime: 2600,
-    auto: true,
-    pellets: 1,
-    spreadDeg: 0,
-    price: 3000,
-    reserveMagazines: 4, // 200 balles
+    id: 'fm_24_29', name: 'FM 24/29', category: 'Fusil-mitrailleur',
+    speedMultiplier: 0.8, damage: 40, fireRate: 150, bulletSpeed: 650, bulletLifespan: 1600,
+    magazineSize: 50, reloadTime: 2600, auto: true, pellets: 1, spreadDeg: 0, price: 3000,
+    reserveMagazines: 4,
   },
 };

@@ -7,6 +7,8 @@ import {
   SPAWN_POINTS,
   SPAWN_JITTER,
   WALLS,
+  FORGE_SPOT,
+  EGG,
 } from '../config/map.config';
 import {
   FANTASSIN_STATS,
@@ -33,8 +35,8 @@ import { Zombie } from '../entities/Zombie';
 import { Bullet } from '../entities/Bullet';
 import { RoundManager } from '../systems/RoundManager';
 import { Pathfinder } from '../systems/Pathfinding';
-import { AMMO_REFILL_PRICE } from '../config/weapons.config';
-import { VillageMap } from '../world/VillageMap';
+import { UPGRADE_PRICE } from '../config/weapons.config';
+import { VillageMap, DebrisObject } from '../world/VillageMap';
 import { registerGame } from '../systems/Records';
 
 const INTERACT_RANGE = 90; // distance pour interagir (débris, caisses d'armes)
@@ -50,6 +52,15 @@ export class GameScene extends Phaser.Scene {
   private poisonClouds: { x: number; y: number; until: number; vis: Phaser.GameObjects.Arc }[] = [];
   private poisonTickAccum: number = 0;
   private ammoCrates: { x: number; y: number; parts: Phaser.GameObjects.GameObject[] }[] = [];
+
+  // Easter-egg du gros débris (raccourci forêt ⇄ église)
+  private eggExplosifsTaken = false;
+  private eggExplosifsPlaced = false;
+  private eggDetonateurTaken = false;
+  private eggDone = false;
+  private explosifsParts: Phaser.GameObjects.GameObject[] = [];
+  private detonateurParts: Phaser.GameObjects.GameObject[] = [];
+  private eggChargeParts: Phaser.GameObjects.GameObject[] = [];
 
   private points: number = 0;
   private kills: number = 0;
@@ -77,7 +88,6 @@ export class GameScene extends Phaser.Scene {
     this.points = 0;
     this.kills = 0;
     this.promptOverrideUntil = 0;
-    // Les listeners survivent au restart : on repart de zéro
     this.events.off('playerDead', this.onPlayerDead, this);
     this.events.off('zombieHit', this.onZombieHit, this);
     this.events.off('zombieKilled', this.onZombieKilled, this);
@@ -87,6 +97,13 @@ export class GameScene extends Phaser.Scene {
     this.poisonClouds = [];
     this.poisonTickAccum = 0;
     this.ammoCrates = [];
+    this.eggExplosifsTaken = false;
+    this.eggExplosifsPlaced = false;
+    this.eggDetonateurTaken = false;
+    this.eggDone = false;
+    this.explosifsParts = [];
+    this.detonateurParts = [];
+    this.eggChargeParts = [];
 
     // Map du village + grille de pathfinding
     this.physics.world.setBounds(0, 0, MAP_WIDTH, MAP_HEIGHT);
@@ -99,6 +116,9 @@ export class GameScene extends Phaser.Scene {
     for (const d of this.map.debris) {
       this.pathfinder.addObstacleRect(d.def.x, d.def.y, d.def.w, d.def.h);
     }
+
+    // Marqueurs de l'easter-egg (explosifs dans la cabane, détonateur dans la grange)
+    this.createEggMarkers();
 
     // Joueur — devant l'autel de l'église
     this.player = new Player(this, PLAYER_START.x, PLAYER_START.y);
@@ -113,8 +133,7 @@ export class GameScene extends Phaser.Scene {
     this.keyInteract = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E);
     this.keyPause = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
 
-    // M : retour au menu — direct au game over (rien à perdre),
-    // avec confirmation depuis la pause (la progression serait perdue)
+    // M : retour au menu
     this.input.keyboard!.on('keydown-M', () => {
       if (this.gameOver) {
         this.physics.resume();
@@ -237,10 +256,60 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  /** Crée les objets ramassables de l'easter-egg (explosifs + détonateur). */
+  private createEggMarkers(): void {
+    const e = EGG.explosifs;
+    const box = this.add.rectangle(e.x, e.y, 28, 18, 0x8e2b20).setDepth(6);
+    const stick1 = this.add.rectangle(e.x - 5, e.y - 4, 5, 16, 0xd35400).setDepth(6);
+    const stick2 = this.add.rectangle(e.x + 5, e.y - 4, 5, 16, 0xd35400).setDepth(6);
+    this.explosifsParts = [box, stick1, stick2];
+
+    const d = EGG.detonateur;
+    const planks = this.add.rectangle(d.x, d.y, 30, 22, 0x3a2a1c).setDepth(5);
+    const body = this.add.rectangle(d.x, d.y, 16, 12, 0x37474f).setDepth(6);
+    const handle = this.add.rectangle(d.x, d.y - 9, 18, 5, 0x90a4ae).setDepth(6);
+    this.detonateurParts = [planks, body, handle];
+  }
+
+  private clearEggMarker(which: 'explosifs' | 'detonateur'): void {
+    const parts = which === 'explosifs' ? this.explosifsParts : this.detonateurParts;
+    parts.forEach(p => p.destroy());
+    if (which === 'explosifs') this.explosifsParts = [];
+    else this.detonateurParts = [];
+  }
+
+  /** Pose visuelle des explosifs contre le gros débris. */
+  private placeChargeVisual(x: number, y: number): void {
+    const c1 = this.add.rectangle(x - 32, y, 16, 30, 0x8e2b20).setDepth(3);
+    const c2 = this.add.rectangle(x + 32, y, 16, 30, 0x8e2b20).setDepth(3);
+    const wire = this.add.rectangle(x, y, 64, 4, 0xd35400).setDepth(3);
+    this.eggChargeParts = [c1, c2, wire];
+  }
+
+  /** Déclenche l'explosion : ouvre le raccourci forêt ⇄ église. */
+  private blowGrosDebris(d: DebrisObject): void {
+    if (this.eggDone) return;
+    this.eggDone = true;
+    this.eggChargeParts.forEach(p => p.destroy());
+    this.eggChargeParts = [];
+    this.map.clear(d);
+    this.pathfinder.removeObstacleRect(d.def.x, d.def.y, d.def.w, d.def.h);
+
+    const boom = this.add.circle(d.def.x, d.def.y, 90, 0xffa726, 0.7).setDepth(20);
+    this.tweens.add({
+      targets: boom,
+      scale: 2.4,
+      alpha: 0,
+      duration: 650,
+      onComplete: () => boom.destroy(),
+    });
+    this.cameras.main.shake(450, 0.012);
+    this.floatingText(d.def.x, d.def.y - 30, 'PASSAGE OUVERT !', '#ffdd00');
+  }
+
   update(time: number, delta: number): void {
     if (this.gameOver) return;
 
-    // Pause (Échap) — ferme d'abord la modale de confirmation si ouverte
     if (Phaser.Input.Keyboard.JustDown(this.keyPause)) {
       if (this.confirmQuit) {
         this.hideQuitConfirm();
@@ -257,7 +326,6 @@ export class GameScene extends Phaser.Scene {
     this.roundManager.update(time, delta);
     this.updateRoundHud();
 
-    // Purge des zombies détruits + update
     this.zombies = this.zombies.filter(z => z.active);
     this.zombies.forEach(z => z.update(time, delta, this.player));
 
@@ -274,14 +342,11 @@ export class GameScene extends Phaser.Scene {
       }
     );
 
-    // Zombies → joueur (attaque au contact, avec cooldown)
     this.physics.overlap(this.player, this.zombies, (_player, zombie) => {
       (zombie as Zombie).tryAttack(this.player, time);
     });
 
-    // Séparation douce entre zombies : ils se contournent au lieu de se
-    // bloquer mutuellement (les collisions dures créaient des bouchons
-    // dans les vitraux et contre les murs)
+    // Séparation douce entre zombies
     this.physics.overlap(this.zombies, this.zombies, (za, zb) => {
       const a = za as Zombie;
       const b = zb as Zombie;
@@ -304,7 +369,6 @@ export class GameScene extends Phaser.Scene {
     });
 
     // Murs : bloquent les zombies, arrêtent les balles
-    // (les vitraux ne bloquent ni les zombies ni les balles)
     this.physics.collide(this.zombies, this.map.obstacles);
     this.physics.overlap(this.player.bullets, this.map.obstacles, bullet => {
       (bullet as Bullet).destroy();
@@ -342,7 +406,6 @@ export class GameScene extends Phaser.Scene {
 
   /** Le dernier Gazé d'une manche spéciale lâche une caisse de munitions. */
   private dropAmmoCrate(x: number, y: number): void {
-    // 5 caisses max sur la map : la plus ancienne disparaît
     while (this.ammoCrates.length >= AMMO_CRATE_MAX) {
       const oldest = this.ammoCrates.shift()!;
       this.tweens.add({
@@ -379,7 +442,6 @@ export class GameScene extends Phaser.Scene {
 
     if (inPoison) {
       this.poisonTickAccum += delta;
-      // Dégâts par demi-secondes : POISON_DPS/s au total
       while (this.poisonTickAccum >= 500) {
         this.poisonTickAccum -= 500;
         this.player.takeDamage(POISON_DPS / 2);
@@ -401,7 +463,6 @@ export class GameScene extends Phaser.Scene {
     });
     this.poisonClouds.push({ x, y, until: this.time.now + POISON_DURATION, vis });
 
-    // Dernier Gazé de la manche spéciale → caisse de munitions
     if (
       isSpecialRound(this.roundManager.getRound()) &&
       this.roundManager.getRemainingInRound() === 0
@@ -411,11 +472,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Interaction unifiée à la touche E : débris à déblayer et caisses d'armes.
-   * Affiche le prompt de l'interactable le plus proche à portée.
+   * Interaction unifiée à la touche E : débris, caisses d'armes, forge,
+   * et les objets de l'easter-egg (explosifs, détonateur, gros débris).
    */
   private handleInteractions(): void {
-    // Un message temporaire (ex. raison de blocage) garde la main sur le prompt
     if (this.time.now < this.promptOverrideUntil) return;
 
     type Interactable = {
@@ -425,7 +485,7 @@ export class GameScene extends Phaser.Scene {
       label: string;
       price: number;
       canBuy: boolean;
-      blockedReason?: string; // affiché en rouge si on appuie sur E
+      blockedReason?: string;
       buy: () => void;
     };
 
@@ -442,6 +502,52 @@ export class GameScene extends Phaser.Scene {
     for (const d of this.map.debris) {
       if (d.cleared) continue;
       const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, d.def.x, d.def.y);
+
+      // Gros débris scellé : chaîne explosifs → détonateur → explosion.
+      if (d.def.sealed) {
+        let label: string;
+        let canBuy = false;
+        let blockedReason: string | undefined;
+        let act: () => void = () => {};
+
+        if (!this.eggExplosifsPlaced) {
+          if (this.eggExplosifsTaken) {
+            label = 'E — Poser les explosifs sur le mur éboulé';
+            canBuy = true;
+            act = () => {
+              this.eggExplosifsPlaced = true;
+              this.placeChargeVisual(d.def.x, d.def.y);
+              this.floatingText(d.def.x, d.def.y - 24, 'EXPLOSIFS POSÉS', '#e74c3c');
+            };
+          } else {
+            label = 'Mur éboulé — il faudrait des explosifs (cabane de chasse, forêt)';
+            blockedReason = label;
+          }
+        } else if (!this.eggDetonateurTaken) {
+          label = 'Explosifs posés — il manque un détonateur (grange, ferme)';
+          blockedReason = label;
+        } else {
+          label = 'E — DÉCLENCHER L\'EXPLOSION';
+          canBuy = true;
+          act = () => this.blowGrosDebris(d);
+        }
+
+        consider(
+          {
+            x: d.def.x,
+            y: d.def.y,
+            promptY: d.def.y - d.def.h / 2 - 12,
+            label,
+            price: 0,
+            canBuy,
+            blockedReason,
+            buy: act,
+          },
+          dist
+        );
+        continue;
+      }
+
       consider(
         {
           x: d.def.x,
@@ -452,7 +558,6 @@ export class GameScene extends Phaser.Scene {
           canBuy: true,
           buy: () => {
             this.map.clear(d);
-            // Le passage s'ouvre aussi pour le pathfinding des zombies
             this.pathfinder.removeObstacleRect(d.def.x, d.def.y, d.def.w, d.def.h);
           },
         },
@@ -469,24 +574,21 @@ export class GameScene extends Phaser.Scene {
       let canBuy = false;
       let blockedReason: string | undefined;
 
+      const refillPrice = this.player.getAmmoRefillPrice(ws.weapon.id);
       if (owned) {
-        // Arme déjà possédée : la caisse vend des chargeurs
         if (this.player.isReserveFull(ws.weapon.id)) {
           label = `${fullName} — munitions pleines`;
         } else {
-          label = `E — Racheter des chargeurs : ${ws.weapon.name} (${AMMO_REFILL_PRICE} pts)`;
+          label = `E — Racheter des chargeurs : ${ws.weapon.name} (${refillPrice} pts)`;
           canBuy = true;
         }
       } else if (!this.player.hasMainWeapon()) {
-        // Emplacement principal libre : achat direct
         label = `E — Acheter : ${fullName} (${ws.weapon.price} pts)`;
         canBuy = true;
       } else if (this.player.isHoldingPistol()) {
-        // On tient le pistolet : il n'est pas échangeable
         label = `${fullName} (${ws.weapon.price} pts)`;
         blockedReason = `Le MAS 1935A n'est pas échangeable — passe sur ton arme principale (A)`;
       } else {
-        // On tient l'arme principale : l'achat l'échange
         label = `E — Échanger ${this.player.getMainWeaponName()} → ${fullName} (${ws.weapon.price} pts)`;
         canBuy = true;
       }
@@ -497,7 +599,7 @@ export class GameScene extends Phaser.Scene {
           y: ws.spot.y,
           promptY: ws.spot.y - 26,
           label,
-          price: owned ? AMMO_REFILL_PRICE : ws.weapon.price,
+          price: owned ? refillPrice : ws.weapon.price,
           canBuy,
           blockedReason,
           buy: () =>
@@ -534,6 +636,68 @@ export class GameScene extends Phaser.Scene {
       );
     }
 
+    // Easter-egg : ramassage des explosifs (cabane) et du détonateur (grange)
+    if (!this.eggExplosifsTaken) {
+      const e = EGG.explosifs;
+      const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, e.x, e.y);
+      consider(
+        {
+          x: e.x, y: e.y, promptY: e.y - 22,
+          label: 'E — Prendre les explosifs', price: 0, canBuy: true,
+          buy: () => {
+            this.eggExplosifsTaken = true;
+            this.clearEggMarker('explosifs');
+            this.floatingText(e.x, e.y - 20, 'EXPLOSIFS RÉCUPÉRÉS', '#e74c3c');
+          },
+        },
+        dist
+      );
+    }
+    if (!this.eggDetonateurTaken) {
+      const e = EGG.detonateur;
+      const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, e.x, e.y);
+      consider(
+        {
+          x: e.x, y: e.y, promptY: e.y - 22,
+          label: 'E — Fouiller la cache : prendre le détonateur', price: 0, canBuy: true,
+          buy: () => {
+            this.eggDetonateurTaken = true;
+            this.clearEggMarker('detonateur');
+            this.floatingText(e.x, e.y - 20, 'DÉTONATEUR RÉCUPÉRÉ', '#ffdd00');
+          },
+        },
+        dist
+      );
+    }
+
+    // Forge (enclume du cimetière) : amélioration de l'arme TENUE
+    {
+      const dist = Phaser.Math.Distance.Between(
+        this.player.x, this.player.y, FORGE_SPOT.x, FORGE_SPOT.y
+      );
+      const weaponName = this.player.getWeaponName();
+      const upgraded = this.player.isHeldWeaponUpgraded();
+      consider(
+        {
+          x: FORGE_SPOT.x,
+          y: FORGE_SPOT.y,
+          promptY: FORGE_SPOT.y - 30,
+          label: upgraded
+            ? `${weaponName} — déjà améliorée`
+            : `E — Améliorer ${weaponName} : +dégâts, +chargeur (${UPGRADE_PRICE} pts)`,
+          price: UPGRADE_PRICE,
+          canBuy: !upgraded,
+          blockedReason: upgraded ? 'Cette arme est déjà améliorée' : undefined,
+          buy: () => {
+            if (this.player.upgradeHeldWeapon()) {
+              this.floatingText(FORGE_SPOT.x, FORGE_SPOT.y - 24, 'ARME AMÉLIORÉE !', '#ffdd00');
+            }
+          },
+        },
+        dist
+      );
+    }
+
     if (!nearest) {
       this.promptText.setVisible(false);
       return;
@@ -547,7 +711,6 @@ export class GameScene extends Phaser.Scene {
 
     if (Phaser.Input.Keyboard.JustDown(this.keyInteract)) {
       if (!target.canBuy) {
-        // Achat bloqué : afficher la raison en rouge
         if (target.blockedReason) {
           this.promptText.setText(target.blockedReason).setColor('#ff1744');
           this.promptOverrideUntil = this.time.now + 1500;
@@ -559,7 +722,6 @@ export class GameScene extends Phaser.Scene {
         this.promptText.setVisible(false);
         this.updateHud();
       } else {
-        // Pas assez de points : flash rouge
         this.promptText.setColor('#ff1744');
         this.time.delayedCall(300, () => this.promptText.setColor('#ffdd00'));
       }
@@ -568,41 +730,38 @@ export class GameScene extends Phaser.Scene {
 
   /**
    * Cherche un point de sortie de terre juste HORS du champ de la caméra :
-   * proche du joueur, sur une cellule libre, jamais dans l'église
-   * (elle garde ses entrées connues : vitraux + sorties).
+   * proche du joueur, sur une cellule libre, jamais dans l'église, joignable.
    */
   private findOffscreenGroundSpot(): { x: number; y: number } | null {
     const view = this.cameras.main.worldView;
     const baseRadius = Math.hypot(view.width, view.height) / 2;
 
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < 20; i++) {
       const angle = Phaser.Math.FloatBetween(0, Math.PI * 2);
       const radius = baseRadius + Phaser.Math.Between(60, 260);
       const x = this.player.x + Math.cos(angle) * radius;
       const y = this.player.y + Math.sin(angle) * radius;
 
-      // Dans la map (marge des murs d'enceinte)
       if (x < 60 || y < 60 || x > MAP_WIDTH - 60 || y > MAP_HEIGHT - 60) continue;
-      // Jamais dans l'église (intérieur + marge)
       if (x > 810 && x < 1750 && y > 180 && y < 880) continue;
-      // Toujours hors champ
       if (view.contains(x, y)) continue;
-      // Sur une cellule libre de la grille
       if (this.pathfinder.isBlockedAt(x, y)) continue;
+      if (!this.canReachPlayer(x, y)) continue;
 
       return { x, y };
     }
     return null;
   }
 
+  /** Le point peut-il atteindre le joueur (zones scellées exclues) ? */
+  private canReachPlayer(x: number, y: number): boolean {
+    return this.pathfinder.findPath(x, y, this.player.x, this.player.y) !== null;
+  }
+
   /** Spawn un Fantassin : sortie de terre (ground) ou entrée cardinale (edge). */
   private spawnZombie(): void {
     if (this.gameOver) return;
 
-    // Composition de la horde :
-    // - manches spéciales (5, 10, 15…) : 100 % Gazés
-    // - sinon : Coureurs (manche 4+, ≤25 %), puis SS qui remplacent
-    //   progressivement les Fantassins (manche 6+, jusqu'à 85 %)
     const round = this.roundManager.getRound();
     let stats;
     if (isSpecialRound(round)) {
@@ -615,8 +774,7 @@ export class GameScene extends Phaser.Scene {
       stats = { ...FANTASSIN_STATS, hp: fantassinHpForRound(round) };
     }
 
-    // Sortie de terre dynamique juste hors champ (réduit le temps de trajet,
-    // surtout quand le joueur est retranché dans l'église)
+    // Sortie de terre dynamique juste hors champ (priorité : reste près du joueur)
     if (Math.random() < DYNAMIC_SPAWN_CHANCE) {
       const spot = this.findOffscreenGroundSpot();
       if (spot) {
@@ -626,8 +784,25 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    // Sinon : un des 3 points fixes les plus proches du joueur
-    const sorted = [...SPAWN_POINTS].sort(
+    // Sinon : un point fixe proche du joueur. Joignable ET pas trop loin
+    // (~1,3 écran) — éviter qu'un zombie apparaisse à l'autre bout de la map,
+    // pénible à traquer quand il n'en reste qu'un.
+    const view = this.cameras.main.worldView;
+    const maxSpawnDist = Math.hypot(view.width, view.height) * 1.3;
+    const distToPlayer = (p: { x: number; y: number }) =>
+      Phaser.Math.Distance.Between(this.player.x, this.player.y, p.x, p.y);
+    const reachable = SPAWN_POINTS.filter(p => this.canReachPlayer(p.x, p.y));
+    const near = reachable.filter(p => distToPlayer(p) <= maxSpawnDist);
+    if (near.length === 0) {
+      const spot = this.findOffscreenGroundSpot();
+      if (spot) {
+        const emergeMs = Phaser.Math.Between(2000, 3000);
+        this.zombies.push(new Zombie(this, spot.x, spot.y, stats, this.pathfinder, emergeMs));
+        return;
+      }
+    }
+    const pool = near.length > 0 ? near : reachable.length > 0 ? reachable : SPAWN_POINTS;
+    const sorted = [...pool].sort(
       (a, b) =>
         Phaser.Math.Distance.Between(this.player.x, this.player.y, a.x, a.y) -
         Phaser.Math.Distance.Between(this.player.x, this.player.y, b.x, b.y)
@@ -637,14 +812,12 @@ export class GameScene extends Phaser.Scene {
     let y = point.y;
 
     if (point.type === 'edge') {
-      // Hors-map : jitter uniquement le long de la brèche
       if (point.y < 0 || point.y > MAP_HEIGHT) {
         x += Phaser.Math.Between(-SPAWN_JITTER, SPAWN_JITTER);
       } else {
         y += Phaser.Math.Between(-SPAWN_JITTER, SPAWN_JITTER);
       }
     } else {
-      // Sortie de terre : jitter revalidé contre la grille (jamais dans un mur)
       for (let i = 0; i < 5; i++) {
         const jx = point.x + Phaser.Math.Between(-SPAWN_JITTER, SPAWN_JITTER);
         const jy = point.y + Phaser.Math.Between(-SPAWN_JITTER, SPAWN_JITTER);
@@ -664,7 +837,6 @@ export class GameScene extends Phaser.Scene {
     this.updateRoundHud();
 
     const special = isSpecialRound(round);
-    // Annonce centrale qui s'estompe
     const announce = this.add
       .text(
         GAME_WIDTH / 2,
@@ -765,7 +937,6 @@ export class GameScene extends Phaser.Scene {
     this.zombies.forEach(z => z.body && z.body.setVelocity(0, 0));
     this.promptText.setVisible(false);
 
-    // États de service (persistés dans le navigateur)
     registerGame({
       round: this.roundManager.getRound(),
       kills: this.kills,
@@ -787,7 +958,6 @@ export class GameScene extends Phaser.Scene {
       .setScrollFactor(0)
       .setDepth(200);
 
-    // Rejouer (petit délai pour ne pas cliquer par accident en tirant)
     this.time.delayedCall(800, () => {
       const replay = this.add
         .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 90, '— CLIQUE POUR REJOUER —\nM — menu principal', {
